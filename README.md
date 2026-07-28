@@ -2,9 +2,10 @@
 
 Lightweight Python tool that scrapes your GitHub Copilot usage stats and stores them in a local SQLite database.
 
+![Screenshot](assets/screenshot.png)
 ---
 
-## Running with Docker (recommended for team use)
+## Running with Docker
 
 ### 1. Configure (optional)
 
