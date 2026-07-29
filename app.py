@@ -46,6 +46,61 @@ def _cycle_end() -> datetime:
     return start.replace(month=start.month + 1)
 
 
+def _weekday_seconds_between(start: datetime, end: datetime) -> float:
+    """Elapsed seconds between two datetimes counting only Monday-Friday time."""
+    if end <= start:
+        return 0.0
+
+    total = 0.0
+    cursor = start
+    while cursor < end:
+        next_midnight = (cursor + timedelta(days=1)).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        segment_end = min(next_midnight, end)
+        if cursor.weekday() < 5:
+            total += (segment_end - cursor).total_seconds()
+        cursor = segment_end
+    return total
+
+
+def _add_weekday_days(start: datetime, days: float) -> datetime:
+    """Add weekday-only days to a datetime, skipping Saturday/Sunday time."""
+    if days <= 0:
+        return start
+
+    remaining_seconds = days * 86400
+    cursor = start
+
+    while remaining_seconds > 0:
+        # Jump forward to Monday 00:00 if currently in the weekend.
+        if cursor.weekday() >= 5:
+            days_to_monday = 7 - cursor.weekday()
+            cursor = (cursor + timedelta(days=days_to_monday)).replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            continue
+
+        next_midnight = (cursor + timedelta(days=1)).replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        available_seconds = (next_midnight - cursor).total_seconds()
+        consume = min(remaining_seconds, available_seconds)
+        cursor += timedelta(seconds=consume)
+        remaining_seconds -= consume
+
+    return cursor
+
+
 def _burndown_stats(rows: list[dict]) -> dict:
     """
     Compute burndown stats anchored to the current billing cycle
@@ -61,8 +116,8 @@ def _burndown_stats(rows: list[dict]) -> dict:
         if (_ts := _parse_iso_utc(r["captured_at"])) is not None and _ts >= cycle_start
     ]
 
-    days_in_cycle_elapsed = (now - cycle_start).total_seconds() / 86400
-    days_until_reset = (cycle_end - now).total_seconds() / 86400
+    days_in_cycle_elapsed = _weekday_seconds_between(cycle_start, now) / 86400
+    days_until_reset = _weekday_seconds_between(now, cycle_end) / 86400
 
     if not cycle_rows or days_in_cycle_elapsed < 1 / 1440:
         return {
@@ -76,7 +131,7 @@ def _burndown_stats(rows: list[dict]) -> dict:
     current_used = last["used"] or 0
     quota = last["quota"]
 
-    # Burn rate = credits used since cycle start / elapsed days
+    # Burn rate = credits used since cycle start / elapsed weekdays
     daily_burn = current_used / days_in_cycle_elapsed
 
     exhaustion_date = None
@@ -85,7 +140,7 @@ def _burndown_stats(rows: list[dict]) -> dict:
     if daily_burn > 0 and quota is not None:
         remaining_credits = quota - current_used
         days_to_exhaustion = remaining_credits / daily_burn
-        exhaustion_dt = now + timedelta(days=days_to_exhaustion)
+        exhaustion_dt = _add_weekday_days(now, days_to_exhaustion)
         exhaustion_date = exhaustion_dt.strftime("%Y-%m-%d")
         exhausts_before_reset = exhaustion_dt < cycle_end
 
@@ -113,7 +168,7 @@ def _burndown_stats(rows: list[dict]) -> dict:
             if burn_24h > 0 and quota is not None:
                 remaining_credits_now = quota - current_used
                 days_to_exhaustion_24h = remaining_credits_now / burn_24h
-                exhaustion_dt_24h = now + timedelta(days=days_to_exhaustion_24h)
+                exhaustion_dt_24h = _add_weekday_days(now, days_to_exhaustion_24h)
                 exhaustion_date_24h = exhaustion_dt_24h.strftime("%Y-%m-%d")
                 exhausts_before_reset_24h = exhaustion_dt_24h < cycle_end
 
@@ -241,7 +296,7 @@ def api_data():
 
 @app.route("/api/daily")
 def api_daily():
-    """Credits consumed per calendar day for the last 30 days."""
+    """Credits consumed per weekday for the last 30 weekdays with data."""
     # tz_offset_minutes mirrors JS Date.getTimezoneOffset(): UTC - local, in minutes.
     tz_offset_minutes = request.args.get("tz_offset_minutes", 0, type=int)
     local_tz = timezone(timedelta(minutes=-tz_offset_minutes))
@@ -250,14 +305,17 @@ def api_daily():
     rows = [r for r in rows if r["used"] is not None]
     rows.sort(key=lambda r: r["captured_at"])
 
-    # Group by local date string (YYYY-MM-DD)
+    # Group by local weekday date string (YYYY-MM-DD)
     from collections import defaultdict
     by_day: dict[str, list[int]] = defaultdict(list)
     for r in rows:
         dt = datetime.fromisoformat(r["captured_at"])
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        day = dt.astimezone(local_tz).strftime("%Y-%m-%d")
+        local_dt = dt.astimezone(local_tz)
+        if local_dt.weekday() >= 5:
+            continue
+        day = local_dt.strftime("%Y-%m-%d")
         by_day[day].append(r["used"])
 
     # Credits used each day = max - min within that day

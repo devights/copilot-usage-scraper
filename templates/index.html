@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Copilot Usage</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,15 +13,16 @@
       min-height: 100vh; padding: 2rem;
       max-width: 1400px; margin: 0 auto;
     }
-    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 2rem; color: #f0f6fc; }
-    .section { margin-bottom: 2rem; }
+    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.6rem; color: #f0f6fc; }
+    .section { margin-bottom: 1.25rem; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
     .section-title {
       font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.08em; color: #8b949e;
-      margin-bottom: 0.75rem; padding-bottom: 0.4rem;
+      margin-bottom: 0.55rem; padding-bottom: 0.35rem;
       border-bottom: 1px solid #21262d;
     }
-    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.85rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.7rem; }
     .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.2rem 1.1rem; }
     .card .label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
     .card .value { font-size: 1.55rem; font-weight: 700; color: #58a6ff; line-height: 1.1; }
@@ -37,6 +37,47 @@
     .banner { border: 1px solid #30363d; border-left-width: 4px; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
     .banner-warn { background: #231c12; border-left-color: #f0883e; color: #f2cc9d; }
     .banner-danger { background: #2a1517; border-left-color: #f85149; color: #ffd2cf; }
+    .session-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #8b949e;
+      border-radius: 999px;
+      padding: 0.1rem 0.45rem 0.1rem 0.3rem;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+    }
+    .session-toggle:hover { border-color: #58a6ff; color: #c9d1d9; }
+    .session-toggle .chev {
+      display: inline-block;
+      width: 0.8rem;
+      transition: transform 0.2s ease;
+      text-align: center;
+      font-size: 0.72rem;
+      line-height: 1;
+    }
+    .session-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+    .status-badge {
+      display: inline-block;
+      min-width: 5.8rem;
+      text-align: center;
+      border-radius: 999px;
+      padding: 0.09rem 0.42rem;
+      border: 1px solid #30363d;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      line-height: 1.25;
+      color: #8b949e;
+      background: #161b22;
+    }
+    .status-badge.ok { border-color: #2f6b41; color: #7ee787; }
+    .status-badge.warn { border-color: #7a4f1f; color: #f2cc9d; }
+    .status-badge.danger { border-color: #8f3638; color: #ffb3ad; }
     .hidden { display: none; }
     #status { font-size: 0.78rem; color: #8b949e; text-align: right; margin-top: 0.5rem; }
   </style>
@@ -49,8 +90,14 @@
 
   <!-- Session -->
   <div class="section">
-    <div class="section-title">Session</div>
-    <div class="cards">
+    <div class="section-head">
+      <div class="section-title">Session</div>
+      <button type="button" class="session-toggle" id="session-toggle" aria-expanded="false" aria-controls="session-cards">
+        <span class="chev">▶</span>
+        <span id="session-badge" class="status-badge">Unknown</span>
+      </button>
+    </div>
+    <div class="cards hidden" id="session-cards">
       <div class="card" id="card-auth">
         <div class="label">GitHub auth</div>
         <div class="value" id="val-auth">—</div>
@@ -90,7 +137,7 @@
         <div class="sub">of monthly quota</div>
       </div>
       <div class="card" id="card-days">
-        <div class="label">Days until reset</div>
+        <div class="label">Weekdays until reset</div>
         <div class="value" id="val-days">—</div>
         <div class="sub" id="val-reset-date"></div>
       </div>
@@ -124,14 +171,14 @@
     <div class="section-title">Forecast</div>
     <div class="cards">
       <div class="card" id="card-burn">
-        <div class="label">Avg daily burn (cycle)</div>
+        <div class="label">Avg weekday burn (cycle)</div>
         <div class="value" id="val-burn">—</div>
-        <div class="sub">credits / day</div>
+        <div class="sub">credits / weekday</div>
       </div>
       <div class="card" id="card-budget">
-        <div class="label">Daily budget remaining</div>
+        <div class="label">Weekday budget remaining</div>
         <div class="value" id="val-budget">—</div>
-        <div class="sub">credits/day to last until reset</div>
+        <div class="sub">credits/weekday to last until reset</div>
       </div>
       <div class="card" id="card-projected">
         <div class="label">Projected at reset</div>
@@ -158,18 +205,138 @@
   <script>
     const GRID = '#21262d', TICK = '#8b949e';
 
+    // Compress a time-series to only inflection points; long silent gaps become a labelled null marker.
+    function buildCompressedChart(points) {
+      if (!points || points.length === 0) return { labels: [], usage: [], quota: [] };
+      if (points.length === 1) {
+        return { labels: [fmtChartLabel(points[0].x)], usage: [points[0].y], quota: [points[0].quota] };
+      }
+      const span = +new Date(points[points.length - 1].x) - +new Date(points[0].x);
+      const gapThresh = Math.max(2 * 3_600_000, span * 0.05); // min 2 h, or 5 % of total span
+
+      // Collect indices worth keeping (inflection points + neighbours)
+      const keep = new Set([0, points.length - 1]);
+      for (let i = 1; i < points.length; i++) {
+        if (points[i].y !== points[i - 1].y) { keep.add(i - 1); keep.add(i); }
+      }
+
+      const sorted = [...keep].sort((a, b) => a - b);
+      const labels = [], usage = [], quota = [];
+
+      for (let ki = 0; ki < sorted.length; ki++) {
+        const idx = sorted[ki];
+        if (ki > 0) {
+          const prevIdx = sorted[ki - 1];
+          const dt = +new Date(points[idx].x) - +new Date(points[prevIdx].x);
+          if (dt > gapThresh) {
+            const hrs = Math.round(dt / 3_600_000);
+            labels.push(hrs >= 48 ? `\u2015 ${Math.round(hrs / 24)}d gap \u2015` : `\u2015 ${hrs}h gap \u2015`);
+            usage.push(null);
+            quota.push(null);
+          }
+        }
+        labels.push(fmtChartLabel(points[idx].x));
+        usage.push(points[idx].y);
+        quota.push(points[idx].quota);
+      }
+      return { labels, usage, quota };
+    }
+
+    function fmtChartLabel(x) {
+      const d = new Date(x);
+      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    // Plugin: draw a pill badge + dashed rule at each gap slot in the chart area.
+    const gapAnnotationPlugin = {
+      id: 'gapAnnotation',
+      afterDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        if (!x || !y) return;
+        const labels = chart.data.labels ?? [];
+        labels.forEach((label, i) => {
+          if (!label.includes('gap')) return;
+          const xPos = x.getPixelForValue(i);
+          const top = y.top, bottom = y.bottom;
+
+          ctx.save();
+
+          // Dashed vertical rule
+          ctx.strokeStyle = '#444c56';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(xPos, top);
+          ctx.lineTo(xPos, bottom);
+          ctx.stroke();
+
+          // Pill badge
+          const text = label.replace(/\u2015\s*/g, '').trim();
+          ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          const tw = ctx.measureText(text).width;
+          const px = 8, py = 4;
+          const bw = tw + px * 2, bh = 10 + py * 2;
+          const bx = xPos - bw / 2;
+          const by = top + (bottom - top) / 2 - bh / 2;
+          const r = 4;
+
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#161b22';
+          ctx.strokeStyle = '#444c56';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(bx + r, by);
+          ctx.lineTo(bx + bw - r, by);
+          ctx.arcTo(bx + bw, by, bx + bw, by + r, r);
+          ctx.lineTo(bx + bw, by + bh - r);
+          ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r);
+          ctx.lineTo(bx + r, by + bh);
+          ctx.arcTo(bx, by + bh, bx, by + bh - r, r);
+          ctx.lineTo(bx, by + r);
+          ctx.arcTo(bx, by, bx + r, by, r);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#8b949e';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, xPos, by + bh / 2);
+
+          ctx.restore();
+        });
+      },
+    };
+
     const lineChart = new Chart(document.getElementById('chart').getContext('2d'), {
-      type: 'line', data: { datasets: [] },
+      type: 'line', data: { labels: [], datasets: [] },
+      plugins: [gapAnnotationPlugin],
       options: {
         responsive: true,
         interaction: { mode: 'index', intersect: false },
         scales: {
-          x: { type: 'time', time: { tooltipFormat: 'MMM d, HH:mm' }, ticks: { color: TICK }, grid: { color: GRID } },
+          x: {
+            type: 'category',
+            ticks: {
+              color: TICK, maxRotation: 45, autoSkip: true, maxTicksLimit: 14,
+              // Suppress tick label for gap slots — the pill draws it instead
+              callback: function(val) {
+                const lbl = this.getLabelForValue(val);
+                return lbl?.includes('gap') ? '' : lbl;
+              },
+            },
+            grid: { color: GRID },
+          },
           y: { beginAtZero: true, ticks: { color: TICK }, grid: { color: GRID }, title: { display: true, text: 'AI Credits', color: TICK } },
         },
         plugins: {
           legend: { labels: { color: '#e6edf3' } },
-          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}` } },
+          tooltip: {
+            callbacks: {
+              title: items => items[0]?.label ?? '',
+              label: c => c.parsed.y == null ? '' : ` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}`,
+            },
+          },
         },
       },
     });
@@ -195,6 +362,32 @@
       el.classList.remove('ok', 'warn', 'danger');
       if (cls) el.classList.add(cls);
     }
+    function addWeekdays(start, weekdayDays) {
+      if (!(start instanceof Date) || Number.isNaN(start.getTime()) || weekdayDays == null || weekdayDays <= 0) {
+        return start;
+      }
+      const result = new Date(start.getTime());
+      let remainingMs = weekdayDays * 86_400_000;
+
+      while (remainingMs > 0) {
+        const dow = result.getDay(); // 0=Sun, 6=Sat
+        if (dow === 0 || dow === 6) {
+          const daysToMonday = dow === 6 ? 2 : 1;
+          result.setDate(result.getDate() + daysToMonday);
+          result.setHours(0, 0, 0, 0);
+          continue;
+        }
+
+        const nextMidnight = new Date(result);
+        nextMidnight.setHours(24, 0, 0, 0);
+        const availableMs = nextMidnight.getTime() - result.getTime();
+        const consume = Math.min(remainingMs, availableMs);
+        result.setTime(result.getTime() + consume);
+        remainingMs -= consume;
+      }
+
+      return result;
+    }
     function pctClass(pct)  { return pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : 'ok'; }
     function exClass(days, reset) {
       if (days == null) return null;
@@ -216,6 +409,20 @@
       el.classList.remove('hidden');
     }
     function hideBanner(id) { document.getElementById(id).classList.add('hidden'); }
+    function updateSessionBadge(label, cls) {
+      const badge = document.getElementById('session-badge');
+      badge.textContent = label;
+      badge.classList.remove('ok', 'warn', 'danger');
+      if (cls) badge.classList.add(cls);
+    }
+
+    const sessionToggle = document.getElementById('session-toggle');
+    const sessionCards = document.getElementById('session-cards');
+    sessionToggle.addEventListener('click', () => {
+      const expanded = sessionToggle.getAttribute('aria-expanded') === 'true';
+      sessionToggle.setAttribute('aria-expanded', String(!expanded));
+      sessionCards.classList.toggle('hidden', expanded);
+    });
 
     async function refresh() {
       const {
@@ -271,6 +478,17 @@
         hideBanner('stale-warning');
       }
 
+      let sessionState = 'ok';
+      let sessionLabel = 'Healthy';
+      if (!authOk || (auth?.remaining_seconds != null && auth.remaining_seconds <= 0) || stale_data) {
+        sessionState = 'danger';
+        sessionLabel = 'Needs attention';
+      } else if ((auth?.remaining_seconds != null && auth.remaining_seconds <= 86400) || data_age_seconds > Math.max(scan_interval_seconds, 0)) {
+        sessionState = 'warn';
+        sessionLabel = 'Check soon';
+      }
+      updateSessionBadge(sessionLabel, sessionState);
+
       // This Cycle
       setText('val-used',        latest_used?.toLocaleString());
       setText('val-quota-sub',   quota != null ? `of ${quota.toLocaleString()} quota` : null);
@@ -315,7 +533,7 @@
           if (stats.burn_24h > 0 && q != null && lu != null) {
             const remaining = q - lu;
             stats.days_to_exhaustion_24h = Math.round(remaining / stats.burn_24h * 10) / 10;
-            const exDate24h = new Date(Date.now() + stats.days_to_exhaustion_24h * 86_400_000);
+            const exDate24h = addWeekdays(new Date(), stats.days_to_exhaustion_24h);
             stats.exhaustion_date_24h = exDate24h.toLocaleDateString('en-CA');
             const resetDate = stats.cycle_reset_date ? new Date(stats.cycle_reset_date + 'T00:00:00') : null;
             stats.exhausts_before_reset_24h = resetDate != null && exDate24h < resetDate;
@@ -342,7 +560,7 @@
       setText('val-burn-today', stats.burn_24h   != null ? stats.burn_24h.toLocaleString()   : '—');
       setClass('card-exhaust-today', exClass(stats.days_to_exhaustion_24h, stats.days_remaining));
       if (stats.days_to_exhaustion_24h != null) {
-        setText('val-exhaust-today-days', stats.days_to_exhaustion_24h + ' days');
+        setText('val-exhaust-today-days', stats.days_to_exhaustion_24h + ' weekdays');
         setText('val-exhaust-today-date',
           stats.exhausts_before_reset_24h
             ? `⚠ before reset on ${stats.cycle_reset_date}`
@@ -367,7 +585,7 @@
 
       setClass('card-exhaust', exClass(stats.days_to_exhaustion, stats.days_remaining));
       if (stats.days_to_exhaustion != null) {
-        setText('val-exhaust-days', stats.days_to_exhaustion + ' days');
+        setText('val-exhaust-days', stats.days_to_exhaustion + ' weekdays');
         setText('val-exhaust-date',
           stats.exhausts_before_reset
             ? `⚠ before reset on ${stats.cycle_reset_date}`
@@ -377,17 +595,18 @@
         setText('val-exhaust-date', 'at current rate');
       }
 
-      // Line chart
-      const usageData = points.map(p => ({ x: p.x, y: p.y }));
-      const quotaData  = points.map(p => ({ x: p.x, y: p.quota }));
+      // Line chart — compress flat periods
+      const { labels: cLabels, usage: cUsage, quota: cQuota } = buildCompressedChart(points);
+      lineChart.data.labels = cLabels;
       lineChart.data.datasets = [
-        { label: 'AI Credits Used', data: usageData, borderColor: '#58a6ff',
+        { label: 'AI Credits Used', data: cUsage, borderColor: '#58a6ff',
           backgroundColor: 'rgba(88,166,255,0.10)', fill: true, tension: 0.3,
-          pointRadius: usageData.length < 60 ? 3 : 0, borderWidth: 2 },
-        { label: 'Quota', data: quotaData, borderColor: '#f85149',
-          borderDash: [6,4], borderWidth: 1.5, pointRadius: 0, fill: false },
+          spanGaps: false,
+          pointRadius: cUsage.length < 60 ? 3 : 0, borderWidth: 2 },
+        { label: 'Quota', data: cQuota, borderColor: '#f85149',
+          borderDash: [6,4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: false },
       ];
-      lineChart.update();
+      lineChart.update('none');
 
       document.getElementById('status').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
     }
@@ -397,12 +616,12 @@
       const days = await fetch(`/api/daily?tz_offset_minutes=${tzOffset}`).then(r => r.json());
       barChart.data.labels   = days.map(d => d.date);
       barChart.data.datasets = [{
-        label: 'Credits consumed per day (last 30 days)',
+        label: 'Credits consumed per weekday (last 30 weekdays)',
         data: days.map(d => d.credits),
         backgroundColor: 'rgba(88,166,255,0.6)',
         borderColor: '#58a6ff', borderWidth: 1, borderRadius: 3,
       }];
-      barChart.update();
+      barChart.update('none');
     }
 
     refresh();
