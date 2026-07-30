@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS scrape_errors (
 );
 
 CREATE INDEX IF NOT EXISTS idx_errors_occurred_at ON scrape_errors (occurred_at);
+
+CREATE TABLE IF NOT EXISTS metadata (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -49,6 +54,25 @@ def get_conn(db_path: Path = DB_PATH):
 def init_db(db_path: Path = DB_PATH) -> None:
     with get_conn(db_path) as conn:
         conn.executescript(SCHEMA)
+
+
+def set_metadata(key: str, value: str, db_path: Path = DB_PATH) -> None:
+    """Upsert a metadata key/value pair."""
+    with get_conn(db_path) as conn:
+        conn.execute(
+            "INSERT INTO metadata (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+
+
+def get_metadata(key: str, db_path: Path = DB_PATH) -> str | None:
+    """Return the value for a metadata key, or None if absent."""
+    with get_conn(db_path) as conn:
+        row = conn.execute(
+            "SELECT value FROM metadata WHERE key = ?", (key,)
+        ).fetchone()
+    return row["value"] if row else None
 
 
 def get_last_snapshot(metric_name: str, db_path: Path = DB_PATH) -> dict | None:
@@ -74,9 +98,15 @@ def save_snapshot(metrics: list[dict], db_path: Path = DB_PATH) -> int:
     Skips inserting a row when both ``used`` and ``quota`` are identical to the
     most recently stored snapshot for that metric (deduplication).
 
+    Always records ``last_scrape_at`` in the metadata table so the staleness
+    check in the API reflects when the scraper last ran, not just when data
+    last changed.
+
     Returns the number of rows actually inserted.
     """
     now = datetime.now(timezone.utc).isoformat()
+    set_metadata("last_scrape_at", now, db_path)
+
     to_insert = []
     for m in metrics:
         last = get_last_snapshot(m["metric_name"], db_path)

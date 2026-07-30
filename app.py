@@ -256,8 +256,19 @@ def _build_usage_payload(
     interval_seconds = _env_int("SCAN_INTERVAL", 120)
     stale_after_seconds = interval_seconds * 2
     age_seconds = None
-    if latest_ts is not None:
-        age_seconds = int((now - latest_ts).total_seconds())
+
+    # Prefer the last scrape timestamp (updated even when data is unchanged due
+    # to deduplication) so the staleness indicator reflects actual scraper
+    # activity rather than only data changes.
+    last_scrape_raw = db.get_metadata("last_scrape_at")
+    last_scrape_ts = _parse_iso_utc(last_scrape_raw) if last_scrape_raw else None
+    freshest_ts = max(
+        (ts for ts in (latest_ts, last_scrape_ts) if ts is not None),
+        default=None,
+    )
+
+    if freshest_ts is not None:
+        age_seconds = int((now - freshest_ts).total_seconds())
     stale_data = age_seconds is None or age_seconds > stale_after_seconds
 
     auth = scraper.get_auth_status(
