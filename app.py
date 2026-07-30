@@ -15,6 +15,9 @@ import scraper
 
 app = Flask(__name__)
 
+# Ensure all tables exist (safe to call repeatedly; uses CREATE IF NOT EXISTS).
+db.init_db()
+
 
 def _env_int(name: str, default: int) -> int:
     try:
@@ -397,6 +400,26 @@ def api_export():
         mimetype="application/json",
         headers={"Content-Disposition": "attachment; filename=copilot-usage.json"},
     )
+
+
+@app.route("/api/errors")
+def api_errors():
+    """Return recent scrape errors.
+
+    Query params:
+      limit   max rows to return (default: 50)
+      from    ISO date/datetime, inclusive lower bound
+      to      ISO date/datetime, inclusive upper bound
+    """
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    from_ts = request.args.get("from")
+    to_ts = request.args.get("to")
+
+    rows = db.query_scrape_errors(limit=limit, from_ts=from_ts, to_ts=to_ts)
+    return jsonify(rows)
 
 
 if __name__ == "__main__":

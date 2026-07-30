@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS usage_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_captured_at ON usage_snapshots (captured_at);
 CREATE INDEX IF NOT EXISTS idx_metric_name ON usage_snapshots (metric_name);
+
+CREATE TABLE IF NOT EXISTS scrape_errors (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at TEXT    NOT NULL,
+    error_type  TEXT    NOT NULL,
+    message     TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_errors_occurred_at ON scrape_errors (occurred_at);
 """
 
 
@@ -87,6 +96,57 @@ def save_snapshot(metrics: list[dict], db_path: Path = DB_PATH) -> int:
             to_insert,
         )
     return len(to_insert)
+
+
+def log_scrape_error(
+    message: str,
+    error_type: str = "error",
+    db_path: Path = DB_PATH,
+) -> None:
+    """Record a scrape failure to the scrape_errors table."""
+    now = datetime.now(timezone.utc).isoformat()
+    with get_conn(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO scrape_errors (occurred_at, error_type, message)
+            VALUES (?, ?, ?)
+            """,
+            (now, error_type, message),
+        )
+
+
+def query_scrape_errors(
+    limit: int = 50,
+    from_ts: str | None = None,
+    to_ts: str | None = None,
+    db_path: Path = DB_PATH,
+) -> list[dict]:
+    """Return recent scrape errors ordered by occurred_at DESC."""
+    conditions: list[str] = []
+    params: list = []
+
+    if from_ts:
+        conditions.append("occurred_at >= ?")
+        params.append(from_ts)
+    if to_ts:
+        conditions.append("occurred_at <= ?")
+        params.append(to_ts)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            f"""
+            SELECT occurred_at, error_type, message
+            FROM scrape_errors
+            {where}
+            ORDER BY occurred_at DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def query_history(

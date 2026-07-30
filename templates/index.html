@@ -185,6 +185,15 @@
     .status-badge.warn   { border-color: var(--warn-badge-border);   color: var(--warn-badge-text); }
     .status-badge.danger { border-color: var(--danger-badge-border); color: var(--danger-badge-text); }
 
+    /* ── Scrape errors table ─────────────────────────────────── */
+    .errors-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .errors-table th { text-align: left; padding: 0.35rem 0.6rem; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    .errors-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .errors-table tr:last-child td { border-bottom: none; }
+    .err-type { font-family: ui-monospace, monospace; color: var(--banner-warn-text); }
+    .err-msg  { color: var(--text-secondary); word-break: break-word; }
+    .errors-empty { font-size: 0.82rem; color: var(--text-muted); padding: 0.5rem 0; }
+
     .hidden { display: none; }
     #status { font-size: 0.78rem; color: var(--text-muted); text-align: right; margin-top: 0.5rem; }
   </style>
@@ -323,6 +332,12 @@
 
     <div class="chart-wrap"><canvas id="chart"></canvas></div>
     <div class="chart-wrap"><canvas id="chart-daily"></canvas></div>
+  </div>
+
+  <!-- Scrape errors -->
+  <div class="section" id="errors-section">
+    <div class="section-title">Recent scrape errors</div>
+    <div id="errors-container"><span class="errors-empty">Loading&hellip;</span></div>
   </div>
 
   <div id="status">Loading&hellip;</div>
@@ -764,10 +779,36 @@
       barChart.update('none');
     }
 
+    async function refreshErrors() {
+      const container = document.getElementById('errors-container');
+      let rows;
+      try {
+        rows = await fetch('/api/errors?limit=20').then(r => r.json());
+      } catch (_) {
+        container.innerHTML = '<span class="errors-empty">Could not load error log.</span>';
+        return;
+      }
+      if (!rows || rows.length === 0) {
+        container.innerHTML = '<span class="errors-empty">No scrape errors recorded.</span>';
+        return;
+      }
+      const tbody = rows.map(r => {
+        const ts = new Date(r.occurred_at).toLocaleString();
+        const type = `<span class="err-type">${r.error_type}</span>`;
+        const msg  = `<span class="err-msg">${r.message.replace(/</g,'&lt;')}</span>`;
+        return `<tr><td>${ts}</td><td>${type}</td><td>${msg}</td></tr>`;
+      }).join('');
+      container.innerHTML = `<table class="errors-table">
+        <thead><tr><th>Time</th><th>Type</th><th>Message</th></tr></thead>
+        <tbody>${tbody}</tbody></table>`;
+    }
+
     refresh();
     refreshDaily();
+    refreshErrors();
     setInterval(refresh,      30_000);
     setInterval(refreshDaily, 60_000);
+    setInterval(refreshErrors, 60_000);
   </script>
 </body>
 </html>

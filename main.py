@@ -38,7 +38,12 @@ def cmd_watch(args) -> None:
                 else:
                     print("  [WARN] No metrics found this cycle.", file=sys.stderr)
             except Exception as exc:
-                print(f"  [ERROR] {exc}", file=sys.stderr)
+                error_type = type(exc).__name__
+                print(f"  [ERROR] {error_type}: {exc}", file=sys.stderr)
+                try:
+                    db.log_scrape_error(str(exc), error_type=error_type)
+                except Exception:
+                    pass
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\nStopped.")
@@ -51,15 +56,18 @@ def cmd_login(_args) -> None:
 def cmd_scrape(args) -> None:
     db.init_db()
     print("Scraping Copilot usage…")
-    metrics = scraper.scrape(headless=not args.visible, debug=args.debug)
+    try:
+        metrics = scraper.scrape(headless=not args.visible, debug=args.debug)
+    except Exception as exc:
+        error_type = type(exc).__name__
+        print(f"  [ERROR] {error_type}: {exc}", file=sys.stderr)
+        db.log_scrape_error(str(exc), error_type=error_type)
+        sys.exit(1)
 
     if not metrics:
-        print(
-            "\n[WARN] No usage metrics found.\n"
-            "  The page layout may have changed. Run with --debug to save the raw HTML\n"
-            "  and inspect debug_page.html to update selectors in scraper.py.",
-            file=sys.stderr,
-        )
+        msg = "No usage metrics found — page layout may have changed."
+        print(f"\n[WARN] {msg}\n  Run with --debug to save debug_page.html.", file=sys.stderr)
+        db.log_scrape_error(msg, error_type="NoMetrics")
         sys.exit(2)
 
     db.save_snapshot(metrics)
