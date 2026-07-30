@@ -47,12 +47,12 @@ case "$1" in
     exec flask --app app run --host 0.0.0.0 --port "${PORT:-5000}" $RELOAD
     ;;
   watch)
-    exec python main.py watch --interval "${SCAN_INTERVAL:-3600}"
+    exec python main.py watch --interval "${SCAN_INTERVAL:-120}"
     ;;
   *)
     RELOAD=""
     [ "${FLASK_DEBUG:-0}" = "1" ] && RELOAD="--reload"
-    python main.py watch --interval "${SCAN_INTERVAL:-3600}" &
+    python main.py watch --interval "${SCAN_INTERVAL:-120}" &
     WATCHER_PID=$!
     flask --app app run --host 0.0.0.0 --port "${PORT:-5000}" $RELOAD &
     FLASK_PID=$!

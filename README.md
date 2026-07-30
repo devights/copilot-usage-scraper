@@ -57,7 +57,7 @@ All settings are controlled via environment variables (set in `.env` or passed d
 | `HOST_PORT` | `5000` | Host port for the UI |
 | `PORT` | `5000` | Port Flask listens on inside the container |
 | `DATA_DIR` | `./data` | Host directory for `usage.db` and browser session |
-| `SCAN_INTERVAL` | `3600` | Seconds between scrapes |
+| `SCAN_INTERVAL` | `120` | Seconds between scrapes |
 | `VNC_PORT` | `5900` | VNC port used during the one-shot `login` helper |
 | `API_DATA_CACHE_SECONDS` | `10` | TTL for the `/api/data` in-process cache |
 | `AUTH_STATUS_CACHE_SECONDS` | `300` | TTL for the auth-status in-process cache |

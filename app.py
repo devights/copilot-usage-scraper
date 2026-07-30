@@ -272,7 +272,7 @@ def api_data():
 
     latest_ts = _parse_iso_utc(latest.get("captured_at"))
     now = datetime.now(timezone.utc)
-    interval_seconds = _env_int("SCAN_INTERVAL", 3600)
+    interval_seconds = _env_int("SCAN_INTERVAL", 120)
     stale_after_seconds = interval_seconds * 2
     age_seconds = None
     if latest_ts is not None:
