@@ -105,7 +105,7 @@ Data is written to `usage.db` (SQLite) in the project directory.
 
 ```bash
 python main.py history
-python main.py history --metric premium_requests
+python main.py history --metric ai_credits
 python main.py history --limit 20
 
 # Check whether GitHub auth is still active and show a best-effort expiry estimate
@@ -134,7 +134,7 @@ If no metrics are found, run with `--debug` to save `debug_page.html`, inspect i
 usage_snapshots (
     id          INTEGER PRIMARY KEY,
     captured_at TEXT,       -- ISO-8601 UTC timestamp
-    metric_name TEXT,       -- e.g. "premium_requests"
+    metric_name TEXT,       -- e.g. "ai_credits"
     used        INTEGER,    -- current consumption
     quota       INTEGER,    -- monthly limit (null if not found)
     raw_text    TEXT        -- raw string from the page for debugging

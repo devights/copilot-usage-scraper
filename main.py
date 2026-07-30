@@ -3,12 +3,12 @@
 gh-scraper — capture GitHub Copilot usage stats into a local SQLite database.
 
 Usage:
-  python main.py --login          # Log into GitHub (run once)
-  python main.py                  # Scrape and save a snapshot
-  python main.py --history        # Print recent snapshots
-    python main.py auth-status      # Check auth and estimated session expiry
-  python main.py --history --metric premium_requests
-  python main.py --debug          # Also save raw HTML for selector debugging
+    python main.py login                    # Log into GitHub (run once)
+    python main.py                          # Scrape and save a snapshot
+    python main.py history                  # Print recent snapshots
+    python main.py history --metric ai_credits
+    python main.py auth-status              # Check auth and estimated session expiry
+    python main.py scrape --debug           # Also save raw HTML for selector debugging
 """
 
 import argparse

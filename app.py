@@ -255,7 +255,7 @@ def api_data():
 
     latest_ts = _parse_iso_utc(latest.get("captured_at"))
     now = datetime.now(timezone.utc)
-    interval_seconds = int(os.environ.get("SCAN_INTERVAL", 3600))
+    interval_seconds = _env_int("SCAN_INTERVAL", 3600)
     stale_after_seconds = interval_seconds * 2
     age_seconds = None
     if latest_ts is not None:
@@ -309,9 +309,9 @@ def api_daily():
     from collections import defaultdict
     by_day: dict[str, list[int]] = defaultdict(list)
     for r in rows:
-        dt = datetime.fromisoformat(r["captured_at"])
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+        dt = _parse_iso_utc(r["captured_at"])
+        if dt is None:
+            continue
         local_dt = dt.astimezone(local_tz)
         if local_dt.weekday() >= 5:
             continue
@@ -319,14 +319,20 @@ def api_daily():
         by_day[day].append(r["used"])
 
     # Credits used each day = max - min within that day
-    # Ignore days where the counter reset (min > previous day's max)
+    # Ignore days where the counter reset (day min drops below previous day max).
     result = []
-    for day in sorted(by_day)[-30:]:
+    previous_day_max = None
+    for day in sorted(by_day):
         vals = by_day[day]
-        delta = max(vals) - min(vals)
-        result.append({"date": day, "credits": delta})
+        day_min = min(vals)
+        day_max = max(vals)
+        if previous_day_max is not None and day_min < previous_day_max:
+            previous_day_max = day_max
+            continue
+        result.append({"date": day, "credits": day_max - day_min})
+        previous_day_max = day_max
 
-    return jsonify(result)
+    return jsonify(result[-30:])
 
 
 if __name__ == "__main__":
