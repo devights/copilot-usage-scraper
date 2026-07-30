@@ -4,7 +4,7 @@ services:
     image: gh-scraper
     restart: unless-stopped
     ports:
-      - "${HOST_PORT:-5000}:${PORT:-5000}"
+      - "127.0.0.1:${HOST_PORT:-5000}:${PORT:-5000}"
     volumes:
       # Persist the SQLite database on the host
       - "${DATA_DIR:-./data}/usage.db:/data/usage.db"
@@ -15,6 +15,7 @@ services:
       BROWSER_STATE_DIR: /data/browser-state
       SCAN_INTERVAL: "${SCAN_INTERVAL:-3600}"
       PORT: "${PORT:-5000}"
+      BIND_HOST: "0.0.0.0"
 
   # One-shot login helper — run with:  docker compose run --rm login
   # Then open vnc://localhost:5900 in any VNC viewer and log into GitHub.

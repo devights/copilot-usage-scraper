@@ -58,6 +58,10 @@ All settings are controlled via environment variables (set in `.env` or passed d
 | `PORT` | `5000` | Port Flask listens on inside the container |
 | `DATA_DIR` | `./data` | Host directory for `usage.db` and browser session |
 | `SCAN_INTERVAL` | `3600` | Seconds between scrapes |
+| `VNC_PORT` | `5900` | VNC port used during the one-shot `login` helper |
+| `API_DATA_CACHE_SECONDS` | `10` | TTL for the `/api/data` in-process cache |
+| `AUTH_STATUS_CACHE_SECONDS` | `300` | TTL for the auth-status in-process cache |
+| `AUTH_CHECK_TIMEOUT_MS` | `2500` | Browser timeout when checking auth status |
 
 ### Useful commands
 
@@ -116,6 +120,15 @@ python main.py auth-status
 It is only an estimate: GitHub can still require re-authentication earlier due to
 security checks, revoked sessions, or account/org policy changes.
 
+### 4. Continuous watch mode
+
+```bash
+python main.py watch                    # scrape every 3600 s (default)
+python main.py watch --interval 1800   # scrape every 30 minutes
+```
+
+This is what the Docker entrypoint uses; use it locally as an alternative to cron.
+
 ### Automate with cron
 
 To capture a snapshot every hour:
@@ -123,6 +136,27 @@ To capture a snapshot every hour:
 ```cron
 0 * * * * cd /path/to/gh-scraper && python main.py >> scraper.log 2>&1
 ```
+
+## Dashboard
+
+Open `http://localhost:5000` to view the burndown dashboard:
+
+- **This Cycle** — credits used so far this month and remaining quota
+- **Today** — credits consumed since midnight UTC
+- **Forecast** — projected credits at cycle reset based on the weekday burn rate; estimated exhaustion date if over-pace
+- **Line chart** — full usage history with optional date range filter and CSV/JSON export
+
+Burn-rate calculations count only Monday–Friday time so weekend idle periods don't deflate the forecast.
+
+## API
+
+All endpoints are served by the Flask app on the configured `PORT`.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/data` | `?from=` / `?to=` | Full stats payload + chart data (cached 10 s by default; cache bypassed when date params are present) |
+| `GET /api/daily` | `?tz_offset_minutes=` | Credits consumed per weekday for the last 30 weekdays with data |
+| `GET /api/export` | `?format=csv\|json` + `?from=` / `?to=` | Download all snapshots as a file (`Content-Disposition: attachment`) |
 
 ## Troubleshooting
 

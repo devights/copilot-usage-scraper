@@ -289,7 +289,6 @@ def api_data():
             auth["estimated_expiry_utc"].isoformat() if auth["estimated_expiry_utc"] else None
         ),
         "remaining_seconds": auth["remaining_seconds"],
-        "expiry_source_cookie": auth["expiry_source_cookie"],
         "note": auth["estimate_note"],
     }
 
@@ -401,4 +400,5 @@ def api_export():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    _bind_host = os.environ.get("BIND_HOST", "127.0.0.1")
+    app.run(debug=False, host=_bind_host, port=int(os.environ.get("PORT", 5000)))
