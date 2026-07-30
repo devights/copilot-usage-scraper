@@ -91,3 +91,110 @@ def test_api_daily_limits_to_last_30_weekdays(monkeypatch):
     expected_days = [d.strftime("%Y-%m-%d") for d in days][-30:]
     assert [r["date"] for r in payload] == expected_days
     assert all(r["credits"] == 5 for r in payload)
+
+
+# ── Deduplication ──────────────────────────────────────────────────────────────
+
+def test_save_snapshot_deduplication(tmp_path):
+    """Second save with identical used/quota must not insert a new row."""
+    import db
+
+    test_db = tmp_path / "test.db"
+    db.init_db(test_db)
+
+    metric = {"metric_name": "ai_credits", "used": 5000, "quota": 12000, "raw_text": "5,000 / 12,000 AI credits"}
+    inserted_first  = db.save_snapshot([metric], test_db)
+    inserted_second = db.save_snapshot([metric], test_db)  # identical — should be skipped
+
+    rows = db.query_history(metric_name="ai_credits", db_path=test_db)
+    assert inserted_first == 1
+    assert inserted_second == 0
+    assert len(rows) == 1
+
+
+def test_save_snapshot_inserts_when_value_changes(tmp_path):
+    """A new snapshot with different 'used' must be stored."""
+    import db
+
+    test_db = tmp_path / "test.db"
+    db.init_db(test_db)
+
+    db.save_snapshot([{"metric_name": "ai_credits", "used": 5000, "quota": 12000, "raw_text": ""}], test_db)
+    db.save_snapshot([{"metric_name": "ai_credits", "used": 5100, "quota": 12000, "raw_text": ""}], test_db)
+
+    rows = db.query_history(metric_name="ai_credits", db_path=test_db)
+    assert len(rows) == 2
+
+
+# ── Date-range filter ──────────────────────────────────────────────────────────
+
+def test_api_data_date_range_filter(monkeypatch):
+    """?from and ?to should restrict the chart series returned."""
+    rows = [
+        {"captured_at": "2026-07-01T12:00:00+00:00", "used": 100, "quota": 12000, "raw_text": ""},
+        {"captured_at": "2026-07-15T12:00:00+00:00", "used": 200, "quota": 12000, "raw_text": ""},
+        {"captured_at": "2026-07-29T12:00:00+00:00", "used": 300, "quota": 12000, "raw_text": ""},
+    ]
+
+    def fake_query(metric_name, limit, from_ts=None, to_ts=None, db_path=None):
+        result = rows
+        if from_ts:
+            result = [r for r in result if r["captured_at"] >= from_ts]
+        if to_ts:
+            result = [r for r in result if r["captured_at"] <= to_ts]
+        return result
+
+    monkeypatch.setattr(app.db, "query_history", fake_query)
+    monkeypatch.setattr(app.scraper, "get_auth_status", lambda **_: {
+        "authenticated": True, "estimated_expiry_utc": None,
+        "remaining_seconds": 99999, "expiry_source_cookie": None, "estimate_note": "",
+    })
+
+    with app.app.test_client() as client:
+        resp = client.get("/api/data?from=2026-07-10&to=2026-07-20")
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    chart_dates = [p["x"][:10] for p in payload["chart"]]
+    assert "2026-07-01" not in chart_dates
+    assert "2026-07-15" in chart_dates
+    assert "2026-07-29" not in chart_dates
+
+
+def test_api_export_csv(monkeypatch):
+    rows = [
+        {"captured_at": "2026-07-01T00:00:00+00:00", "metric_name": "ai_credits",
+         "used": 100, "quota": 12000, "raw_text": "100 / 12,000 AI credits"},
+    ]
+    monkeypatch.setattr(app.db, "query_history", lambda **_: rows)
+
+    with app.app.test_client() as client:
+        resp = client.get("/api/export?format=csv")
+
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/csv")
+    text = resp.data.decode()
+    assert "captured_at" in text
+    assert "2026-07-01" in text
+
+
+def test_api_export_json(monkeypatch):
+    rows = [
+        {"captured_at": "2026-07-01T00:00:00+00:00", "metric_name": "ai_credits",
+         "used": 100, "quota": 12000, "raw_text": ""},
+    ]
+    monkeypatch.setattr(app.db, "query_history", lambda **_: rows)
+
+    with app.app.test_client() as client:
+        resp = client.get("/api/export?format=json")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert isinstance(data, list)
+    assert data[0]["used"] == 100
+
+
+def test_api_export_invalid_format():
+    with app.app.test_client() as client:
+        resp = client.get("/api/export?format=xml")
+    assert resp.status_code == 400

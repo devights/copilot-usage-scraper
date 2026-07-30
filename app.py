@@ -1,12 +1,14 @@
 """Simple Flask dashboard for Copilot AI credit usage."""
 
+import csv
+import io
 import os
 import threading
 import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, Response
 
 import db
 import scraper
@@ -228,30 +230,45 @@ def index():
 
 @app.route("/api/data")
 def api_data():
+    from_ts = request.args.get("from")  # ISO date/datetime string, inclusive
+    to_ts = request.args.get("to")      # ISO date/datetime string, inclusive
+    filtered = bool(from_ts or to_ts)
+
     now_epoch = time.time()
-    with _API_DATA_CACHE_LOCK:
-        cached_at = _API_DATA_CACHE["cached_at_epoch"]
-        cached_payload = _API_DATA_CACHE["payload"]
-        if (
-            _API_DATA_CACHE_SECONDS > 0
-            and cached_at is not None
-            and cached_payload is not None
-            and (now_epoch - cached_at) < _API_DATA_CACHE_SECONDS
-        ):
-            return jsonify(cached_payload)
+    if not filtered:
+        with _API_DATA_CACHE_LOCK:
+            cached_at = _API_DATA_CACHE["cached_at_epoch"]
+            cached_payload = _API_DATA_CACHE["payload"]
+            if (
+                _API_DATA_CACHE_SECONDS > 0
+                and cached_at is not None
+                and cached_payload is not None
+                and (now_epoch - cached_at) < _API_DATA_CACHE_SECONDS
+            ):
+                return jsonify(cached_payload)
 
-    rows = db.query_history(metric_name="ai_credits", limit=5000)
-    rows = [r for r in rows if r["used"] is not None]
-    rows.sort(key=lambda r: r["captured_at"])
+    # Stats always use the full dataset so burndown is never degraded by chart filters.
+    all_rows = db.query_history(metric_name="ai_credits", limit=5000)
+    all_rows = [r for r in all_rows if r["used"] is not None]
+    all_rows.sort(key=lambda r: r["captured_at"])
+    stats = _burndown_stats(all_rows)
 
-    stats = _burndown_stats(rows)
+    # Chart data is filtered by the requested date range (or full if no filter).
+    if filtered:
+        chart_rows = db.query_history(
+            metric_name="ai_credits", limit=5000, from_ts=from_ts, to_ts=to_ts
+        )
+        chart_rows = [r for r in chart_rows if r["used"] is not None]
+        chart_rows.sort(key=lambda r: r["captured_at"])
+    else:
+        chart_rows = all_rows
 
     chart_data = [
         {"x": r["captured_at"], "y": r["used"], "quota": r["quota"]}
-        for r in rows
+        for r in chart_rows
     ]
 
-    latest = rows[-1] if rows else {}
+    latest = all_rows[-1] if all_rows else {}
 
     latest_ts = _parse_iso_utc(latest.get("captured_at"))
     now = datetime.now(timezone.utc)
@@ -288,9 +305,10 @@ def api_data():
         "auth": auth_payload,
         "stats": stats,
     }
-    with _API_DATA_CACHE_LOCK:
-        _API_DATA_CACHE["cached_at_epoch"] = now_epoch
-        _API_DATA_CACHE["payload"] = payload
+    if not filtered:
+        with _API_DATA_CACHE_LOCK:
+            _API_DATA_CACHE["cached_at_epoch"] = now_epoch
+            _API_DATA_CACHE["payload"] = payload
     return jsonify(payload)
 
 
@@ -333,6 +351,53 @@ def api_daily():
         previous_day_max = day_max
 
     return jsonify(result[-30:])
+
+
+@app.route("/api/export")
+def api_export():
+    """Download all snapshots as JSON or CSV.
+
+    Query params:
+      format  csv | json  (default: json)
+      from    ISO date/datetime, inclusive lower bound
+      to      ISO date/datetime, inclusive upper bound
+    """
+    fmt = request.args.get("format", "json").lower()
+    from_ts = request.args.get("from")
+    to_ts = request.args.get("to")
+
+    if fmt not in ("csv", "json"):
+        return jsonify({"error": "format must be 'csv' or 'json'"}), 400
+
+    rows = db.query_history(
+        metric_name="ai_credits",
+        limit=1_000_000,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+    rows = [r for r in rows if r["used"] is not None]
+    rows.sort(key=lambda r: r["captured_at"])
+
+    if fmt == "csv":
+        buf = io.StringIO()
+        writer = csv.DictWriter(
+            buf,
+            fieldnames=["captured_at", "metric_name", "used", "quota", "raw_text"],
+            extrasaction="ignore",
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+        return Response(
+            buf.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=copilot-usage.csv"},
+        )
+
+    return Response(
+        __import__("json").dumps(rows, indent=2),
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=copilot-usage.json"},
+    )
 
 
 if __name__ == "__main__":

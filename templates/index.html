@@ -1,89 +1,200 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Copilot Usage</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
+    /* ── Theme variables ─────────────────────────────────────── */
+    :root {
+      --bg:              #0d1117;
+      --surface:         #161b22;
+      --grid:            #21262d;
+      --border:          #30363d;
+      --text:            #e6edf3;
+      --text-h:          #f0f6fc;
+      --text-muted:      #8b949e;
+      --text-secondary:  #c9d1d9;
+      --accent:          #58a6ff;
+      --ok:              #3fb950;
+      --warn:            #f0883e;
+      --danger:          #f85149;
+      --ok-badge-text:   #7ee787;
+      --warn-badge-text: #f2cc9d;
+      --danger-badge-text: #ffb3ad;
+      --ok-badge-border:   #2f6b41;
+      --warn-badge-border: #7a4f1f;
+      --danger-badge-border: #8f3638;
+      --banner-warn-bg:   #231c12;
+      --banner-warn-border: #f0883e;
+      --banner-warn-text: #f2cc9d;
+      --banner-danger-bg:   #2a1517;
+      --banner-danger-border: #f85149;
+      --banner-danger-text: #ffd2cf;
+      --gap-color: #444c56;
+      --input-bg: #0d1117;
+      --input-border: #30363d;
+      --input-text: #e6edf3;
+      --btn-bg: #21262d;
+      --btn-hover-bg: #30363d;
+    }
+    [data-theme="light"] {
+      --bg:              #ffffff;
+      --surface:         #f6f8fa;
+      --grid:            #d0d7de;
+      --border:          #d0d7de;
+      --text:            #24292f;
+      --text-h:          #1f2328;
+      --text-muted:      #656d76;
+      --text-secondary:  #24292f;
+      --accent:          #0969da;
+      --ok:              #1a7f37;
+      --warn:            #bc4c00;
+      --danger:          #cf222e;
+      --ok-badge-text:   #1a7f37;
+      --warn-badge-text: #7d4e00;
+      --danger-badge-text: #82071e;
+      --ok-badge-border:   #74c083;
+      --warn-badge-border: #d4a72c;
+      --danger-badge-border: #ffa8a8;
+      --banner-warn-bg:   #fff8c5;
+      --banner-warn-border: #d4a72c;
+      --banner-warn-text: #7d4e00;
+      --banner-danger-bg:   #ffebe9;
+      --banner-danger-border: #cf222e;
+      --banner-danger-text: #82071e;
+      --gap-color: #8c959f;
+      --input-bg: #f6f8fa;
+      --input-border: #d0d7de;
+      --input-text: #24292f;
+      --btn-bg: #f6f8fa;
+      --btn-hover-bg: #eaeef2;
+    }
+
+    /* ── Base ────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0d1117; color: #e6edf3;
+      background: var(--bg); color: var(--text);
       min-height: 100vh; padding: 2rem;
       max-width: 1400px; margin: 0 auto;
+      transition: background 0.2s, color 0.2s;
     }
-    h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1.6rem; color: #f0f6fc; }
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.6rem;
+    }
+    h1 { font-size: 1.4rem; font-weight: 600; color: var(--text-h); }
+
+    /* ── Theme toggle ────────────────────────────────────────── */
+    .theme-toggle {
+      background: var(--btn-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 999px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .theme-toggle:hover { background: var(--btn-hover-bg); border-color: var(--accent); color: var(--text); }
+
+    /* ── Sections & cards ────────────────────────────────────── */
     .section { margin-bottom: 1.25rem; }
     .section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
     .section-title {
       font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.08em; color: #8b949e;
+      letter-spacing: 0.08em; color: var(--text-muted);
       margin-bottom: 0.55rem; padding-bottom: 0.35rem;
-      border-bottom: 1px solid #21262d;
+      border-bottom: 1px solid var(--grid);
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.7rem; }
-    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.2rem 1.1rem; }
-    .card .label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
-    .card .value { font-size: 1.55rem; font-weight: 700; color: #58a6ff; line-height: 1.1; }
-    .card .sub   { font-size: 0.78rem; color: #8b949e; margin-top: 0.3rem; }
-    .card .bar-track { height: 4px; background: #21262d; border-radius: 2px; margin-top: 0.55rem; overflow: hidden; }
-    .card .bar-fill  { height: 100%; border-radius: 2px; background: #58a6ff; transition: width 0.4s ease; }
-    .card.ok     .value { color: #3fb950; } .card.ok     .bar-fill { background: #3fb950; }
-    .card.warn   .value { color: #f0883e; } .card.warn   .bar-fill { background: #f0883e; }
-    .card.danger .value { color: #f85149; } .card.danger .bar-fill { background: #f85149; }
-    .chart-wrap { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.4rem; max-width: 1200px; margin-bottom: 1rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem 1.1rem; }
+    .card .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
+    .card .value { font-size: 1.55rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .card .sub   { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem; }
+    .card .bar-track { height: 4px; background: var(--grid); border-radius: 2px; margin-top: 0.55rem; overflow: hidden; }
+    .card .bar-fill  { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.4s ease; }
+    .card.ok     .value { color: var(--ok); }    .card.ok     .bar-fill { background: var(--ok); }
+    .card.warn   .value { color: var(--warn); }  .card.warn   .bar-fill { background: var(--warn); }
+    .card.danger .value { color: var(--danger); } .card.danger .bar-fill { background: var(--danger); }
+
+    /* ── Charts ──────────────────────────────────────────────── */
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.4rem; max-width: 1200px; margin-bottom: 1rem; }
     canvas { width: 100% !important; }
-    .banner { border: 1px solid #30363d; border-left-width: 4px; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
-    .banner-warn { background: #231c12; border-left-color: #f0883e; color: #f2cc9d; }
-    .banner-danger { background: #2a1517; border-left-color: #f85149; color: #ffd2cf; }
-    .session-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      background: transparent;
-      border: 1px solid #30363d;
-      color: #8b949e;
-      border-radius: 999px;
-      padding: 0.1rem 0.45rem 0.1rem 0.3rem;
-      font-size: 0.68rem;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
+
+    /* ── Date-range + export controls ───────────────────────── */
+    .chart-controls {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem;
+      margin-bottom: 0.8rem;
+    }
+    .chart-controls label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .chart-controls input[type="date"] {
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--input-text);
+      border-radius: 6px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color-scheme: dark;
+    }
+    [data-theme="light"] .chart-controls input[type="date"] { color-scheme: light; }
+    .chart-controls input[type="date"]:focus { outline: none; border-color: var(--accent); }
+    .ctrl-btn {
+      background: var(--btn-bg);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.75rem;
+      font-family: inherit;
       cursor: pointer;
     }
-    .session-toggle:hover { border-color: #58a6ff; color: #c9d1d9; }
-    .session-toggle .chev {
-      display: inline-block;
-      width: 0.8rem;
-      transition: transform 0.2s ease;
-      text-align: center;
-      font-size: 0.72rem;
-      line-height: 1;
+    .ctrl-btn:hover { border-color: var(--accent); color: var(--text); }
+    .ctrl-btn.export { color: var(--accent); border-color: var(--accent); }
+    .ctrl-btn.export:hover { background: var(--btn-hover-bg); }
+    .ctrl-sep { flex: 1; }
+
+    /* ── Banners ─────────────────────────────────────────────── */
+    .banner { border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem; font-size: 0.88rem; }
+    .banner-warn   { background: var(--banner-warn-bg);   border-left-color: var(--banner-warn-border);   color: var(--banner-warn-text); }
+    .banner-danger { background: var(--banner-danger-bg); border-left-color: var(--banner-danger-border); color: var(--banner-danger-text); }
+
+    /* ── Session toggle & badge ──────────────────────────────── */
+    .session-toggle {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 999px; padding: 0.1rem 0.45rem 0.1rem 0.3rem;
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em; cursor: pointer;
     }
+    .session-toggle:hover { border-color: var(--accent); color: var(--text-secondary); }
+    .session-toggle .chev { display: inline-block; width: 0.8rem; transition: transform 0.2s ease; text-align: center; font-size: 0.72rem; line-height: 1; }
     .session-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
     .status-badge {
-      display: inline-block;
-      min-width: 5.8rem;
-      text-align: center;
-      border-radius: 999px;
-      padding: 0.09rem 0.42rem;
-      border: 1px solid #30363d;
-      font-size: 0.62rem;
-      font-weight: 600;
-      letter-spacing: 0.07em;
-      line-height: 1.25;
-      color: #8b949e;
-      background: #161b22;
+      display: inline-block; min-width: 5.8rem; text-align: center;
+      border-radius: 999px; padding: 0.09rem 0.42rem;
+      border: 1px solid var(--border); font-size: 0.62rem; font-weight: 600;
+      letter-spacing: 0.07em; line-height: 1.25; color: var(--text-muted); background: var(--surface);
     }
-    .status-badge.ok { border-color: #2f6b41; color: #7ee787; }
-    .status-badge.warn { border-color: #7a4f1f; color: #f2cc9d; }
-    .status-badge.danger { border-color: #8f3638; color: #ffb3ad; }
+    .status-badge.ok     { border-color: var(--ok-badge-border);     color: var(--ok-badge-text); }
+    .status-badge.warn   { border-color: var(--warn-badge-border);   color: var(--warn-badge-text); }
+    .status-badge.danger { border-color: var(--danger-badge-border); color: var(--danger-badge-text); }
+
     .hidden { display: none; }
-    #status { font-size: 0.78rem; color: #8b949e; text-align: right; margin-top: 0.5rem; }
+    #status { font-size: 0.78rem; color: var(--text-muted); text-align: right; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
-  <h1>GitHub Copilot — AI Credit Usage</h1>
+  <div class="page-header">
+    <h1>GitHub Copilot &mdash; AI Credit Usage</h1>
+    <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">
+      <span id="theme-icon">&#9728;&#65039;</span>
+      <span id="theme-label">Light</span>
+    </button>
+  </div>
 
   <div class="banner banner-danger hidden" id="auth-warning"></div>
   <div class="banner banner-warn hidden" id="stale-warning"></div>
@@ -93,24 +204,24 @@
     <div class="section-head">
       <div class="section-title">Session</div>
       <button type="button" class="session-toggle" id="session-toggle" aria-expanded="false" aria-controls="session-cards">
-        <span class="chev">▶</span>
+        <span class="chev">&#9658;</span>
         <span id="session-badge" class="status-badge">Unknown</span>
       </button>
     </div>
     <div class="cards hidden" id="session-cards">
       <div class="card" id="card-auth">
         <div class="label">GitHub auth</div>
-        <div class="value" id="val-auth">—</div>
+        <div class="value" id="val-auth">&mdash;</div>
         <div class="sub" id="val-auth-sub"></div>
       </div>
       <div class="card" id="card-expiry">
         <div class="label">Estimated session expiry</div>
-        <div class="value" id="val-expiry">—</div>
+        <div class="value" id="val-expiry">&mdash;</div>
         <div class="sub" id="val-expiry-sub"></div>
       </div>
       <div class="card" id="card-freshness">
         <div class="label">Data freshness</div>
-        <div class="value" id="val-freshness">—</div>
+        <div class="value" id="val-freshness">&mdash;</div>
         <div class="sub" id="val-freshness-sub"></div>
       </div>
     </div>
@@ -122,23 +233,23 @@
     <div class="cards">
       <div class="card" id="card-used">
         <div class="label">Credits used</div>
-        <div class="value" id="val-used">—</div>
+        <div class="value" id="val-used">&mdash;</div>
         <div class="sub" id="val-quota-sub"></div>
         <div class="bar-track"><div class="bar-fill" id="bar-used" style="width:0%"></div></div>
       </div>
       <div class="card" id="card-remaining">
         <div class="label">Credits remaining</div>
-        <div class="value" id="val-remaining">—</div>
+        <div class="value" id="val-remaining">&mdash;</div>
         <div class="sub" id="val-remaining-sub"></div>
       </div>
       <div class="card" id="card-pct">
         <div class="label">% used</div>
-        <div class="value" id="val-pct">—</div>
+        <div class="value" id="val-pct">&mdash;</div>
         <div class="sub">of monthly quota</div>
       </div>
       <div class="card" id="card-days">
         <div class="label">Weekdays until reset</div>
-        <div class="value" id="val-days">—</div>
+        <div class="value" id="val-days">&mdash;</div>
         <div class="sub" id="val-reset-date"></div>
       </div>
     </div>
@@ -150,17 +261,17 @@
     <div class="cards">
       <div class="card" id="card-today">
         <div class="label">Credits used today</div>
-        <div class="value" id="val-today">—</div>
+        <div class="value" id="val-today">&mdash;</div>
         <div class="sub">since local midnight</div>
       </div>
       <div class="card" id="card-burn-today">
         <div class="label">Today's burn rate</div>
-        <div class="value" id="val-burn-today">—</div>
+        <div class="value" id="val-burn-today">&mdash;</div>
         <div class="sub">credits / day (needs 1h data)</div>
       </div>
       <div class="card" id="card-exhaust-today">
         <div class="label">Exhaustion at today's rate</div>
-        <div class="value" id="val-exhaust-today-days">—</div>
+        <div class="value" id="val-exhaust-today-days">&mdash;</div>
         <div class="sub" id="val-exhaust-today-date"></div>
       </div>
     </div>
@@ -172,22 +283,22 @@
     <div class="cards">
       <div class="card" id="card-burn">
         <div class="label">Avg weekday burn (cycle)</div>
-        <div class="value" id="val-burn">—</div>
+        <div class="value" id="val-burn">&mdash;</div>
         <div class="sub">credits / weekday</div>
       </div>
       <div class="card" id="card-budget">
         <div class="label">Weekday budget remaining</div>
-        <div class="value" id="val-budget">—</div>
+        <div class="value" id="val-budget">&mdash;</div>
         <div class="sub">credits/weekday to last until reset</div>
       </div>
       <div class="card" id="card-projected">
         <div class="label">Projected at reset</div>
-        <div class="value" id="val-projected">—</div>
+        <div class="value" id="val-projected">&mdash;</div>
         <div class="sub" id="val-projected-sub"></div>
       </div>
       <div class="card" id="card-exhaust">
         <div class="label">Exhaustion at cycle rate</div>
-        <div class="value" id="val-exhaust-days">—</div>
+        <div class="value" id="val-exhaust-days">&mdash;</div>
         <div class="sub" id="val-exhaust-date"></div>
       </div>
     </div>
@@ -196,25 +307,80 @@
   <!-- Charts -->
   <div class="section">
     <div class="section-title">Usage over time</div>
+
+    <div class="chart-controls">
+      <label for="date-from">From</label>
+      <input type="date" id="date-from" />
+      <label for="date-to">To</label>
+      <input type="date" id="date-to" />
+      <button type="button" class="ctrl-btn" id="btn-clear-range">Clear</button>
+      <span class="ctrl-sep"></span>
+      <button type="button" class="ctrl-btn export" id="btn-export-json">&#8595; JSON</button>
+      <button type="button" class="ctrl-btn export" id="btn-export-csv">&#8595; CSV</button>
+    </div>
+
     <div class="chart-wrap"><canvas id="chart"></canvas></div>
     <div class="chart-wrap"><canvas id="chart-daily"></canvas></div>
   </div>
 
-  <div id="status">Loading…</div>
+  <div id="status">Loading&hellip;</div>
 
   <script>
-    const GRID = '#21262d', TICK = '#8b949e';
+    // ── Theme ────────────────────────────────────────────────────
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon   = document.getElementById('theme-icon');
+    const themeLabel  = document.getElementById('theme-label');
 
-    // Compress a time-series to only inflection points; long silent gaps become a labelled null marker.
+    function applyTheme(theme) {
+      html.dataset.theme = theme;
+      if (theme === 'light') {
+        themeIcon.textContent  = '\u{1F319}';
+        themeLabel.textContent = 'Dark';
+      } else {
+        themeIcon.textContent  = '\u2600\uFE0F';
+        themeLabel.textContent = 'Light';
+      }
+    }
+
+    applyTheme(localStorage.getItem('theme') || 'dark');
+
+    themeToggle.addEventListener('click', () => {
+      const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      applyTheme(next);
+      updateChartThemeColors();
+    });
+
+    // ── Chart color helpers ──────────────────────────────────────
+    function cssVar(name) { return getComputedStyle(html).getPropertyValue(name).trim(); }
+
+    function updateChartThemeColors() {
+      const tick = cssVar('--text-muted'), grid = cssVar('--grid'), text = cssVar('--text');
+      for (const ch of [lineChart, barChart]) {
+        if (ch.options.scales.x) {
+          ch.options.scales.x.ticks.color = tick;
+          ch.options.scales.x.grid.color  = grid;
+        }
+        if (ch.options.scales.y) {
+          ch.options.scales.y.ticks.color = tick;
+          ch.options.scales.y.grid.color  = grid;
+          if (ch.options.scales.y.title) ch.options.scales.y.title.color = tick;
+        }
+        if (ch.options.plugins?.legend?.labels) ch.options.plugins.legend.labels.color = text;
+        ch.update('none');
+      }
+    }
+
+    // ── Chart compression ────────────────────────────────────────
     function buildCompressedChart(points) {
       if (!points || points.length === 0) return { labels: [], usage: [], quota: [] };
       if (points.length === 1) {
         return { labels: [fmtChartLabel(points[0].x)], usage: [points[0].y], quota: [points[0].quota] };
       }
       const span = +new Date(points[points.length - 1].x) - +new Date(points[0].x);
-      const gapThresh = Math.max(2 * 3_600_000, span * 0.05); // min 2 h, or 5 % of total span
+      const gapThresh = Math.max(2 * 3_600_000, span * 0.05);
 
-      // Collect indices worth keeping (inflection points + neighbours)
       const keep = new Set([0, points.length - 1]);
       for (let i = 1; i < points.length; i++) {
         if (points[i].y !== points[i - 1].y) { keep.add(i - 1); keep.add(i); }
@@ -230,7 +396,7 @@
           const dt = +new Date(points[idx].x) - +new Date(points[prevIdx].x);
           if (dt > gapThresh) {
             const hrs = Math.round(dt / 3_600_000);
-            labels.push(hrs >= 48 ? `\u2015 ${Math.round(hrs / 24)}d gap \u2015` : `\u2015 ${hrs}h gap \u2015`);
+            labels.push(hrs >= 48 ? '\u2015 ' + Math.round(hrs / 24) + 'd gap \u2015' : '\u2015 ' + hrs + 'h gap \u2015');
             usage.push(null);
             quota.push(null);
           }
@@ -247,22 +413,19 @@
       return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
     }
 
-    // Plugin: draw a pill badge + dashed rule at each gap slot in the chart area.
     const gapAnnotationPlugin = {
       id: 'gapAnnotation',
       afterDraw(chart) {
         const { ctx, scales: { x, y } } = chart;
         if (!x || !y) return;
-        const labels = chart.data.labels ?? [];
+        const labels = chart.data.labels || [];
         labels.forEach((label, i) => {
           if (!label.includes('gap')) return;
           const xPos = x.getPixelForValue(i);
           const top = y.top, bottom = y.bottom;
-
           ctx.save();
 
-          // Dashed vertical rule
-          ctx.strokeStyle = '#444c56';
+          ctx.strokeStyle = cssVar('--gap-color');
           ctx.lineWidth = 1;
           ctx.setLineDash([4, 4]);
           ctx.beginPath();
@@ -270,7 +433,6 @@
           ctx.lineTo(xPos, bottom);
           ctx.stroke();
 
-          // Pill badge
           const text = label.replace(/\u2015\s*/g, '').trim();
           ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
           const tw = ctx.measureText(text).width;
@@ -281,12 +443,11 @@
           const r = 4;
 
           ctx.setLineDash([]);
-          ctx.fillStyle = '#161b22';
-          ctx.strokeStyle = '#444c56';
+          ctx.fillStyle   = cssVar('--surface');
+          ctx.strokeStyle = cssVar('--gap-color');
           ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(bx + r, by);
-          ctx.lineTo(bx + bw - r, by);
+          ctx.moveTo(bx + r, by); ctx.lineTo(bx + bw - r, by);
           ctx.arcTo(bx + bw, by, bx + bw, by + r, r);
           ctx.lineTo(bx + bw, by + bh - r);
           ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r);
@@ -295,14 +456,11 @@
           ctx.lineTo(bx, by + r);
           ctx.arcTo(bx, by, bx + r, by, r);
           ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
+          ctx.fill(); ctx.stroke();
 
-          ctx.fillStyle = '#8b949e';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+          ctx.fillStyle = cssVar('--text-muted');
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(text, xPos, by + bh / 2);
-
           ctx.restore();
         });
       },
@@ -318,23 +476,22 @@
           x: {
             type: 'category',
             ticks: {
-              color: TICK, maxRotation: 45, autoSkip: true, maxTicksLimit: 14,
-              // Suppress tick label for gap slots — the pill draws it instead
+              color: cssVar('--text-muted'), maxRotation: 45, autoSkip: true, maxTicksLimit: 14,
               callback: function(val) {
                 const lbl = this.getLabelForValue(val);
-                return lbl?.includes('gap') ? '' : lbl;
+                return lbl && lbl.includes('gap') ? '' : lbl;
               },
             },
-            grid: { color: GRID },
+            grid: { color: cssVar('--grid') },
           },
-          y: { beginAtZero: true, ticks: { color: TICK }, grid: { color: GRID }, title: { display: true, text: 'AI Credits', color: TICK } },
+          y: { beginAtZero: true, ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid') }, title: { display: true, text: 'AI Credits', color: cssVar('--text-muted') } },
         },
         plugins: {
-          legend: { labels: { color: '#e6edf3' } },
+          legend: { labels: { color: cssVar('--text') } },
           tooltip: {
             callbacks: {
-              title: items => items[0]?.label ?? '',
-              label: c => c.parsed.y == null ? '' : ` ${c.dataset.label}: ${c.parsed.y.toLocaleString()}`,
+              title: items => items[0] ? items[0].label : '',
+              label: c => c.parsed.y == null ? '' : ' ' + c.dataset.label + ': ' + c.parsed.y.toLocaleString(),
             },
           },
         },
@@ -346,46 +503,38 @@
       options: {
         responsive: true,
         scales: {
-          x: { ticks: { color: TICK }, grid: { color: GRID } },
-          y: { beginAtZero: true, ticks: { color: TICK }, grid: { color: GRID }, title: { display: true, text: 'Credits consumed', color: TICK } },
+          x: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid') } },
+          y: { beginAtZero: true, ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid') }, title: { display: true, text: 'Credits consumed', color: cssVar('--text-muted') } },
         },
         plugins: {
-          legend: { labels: { color: '#e6edf3' } },
-          tooltip: { callbacks: { label: c => ` ${c.parsed.y.toLocaleString()} credits` } },
+          legend: { labels: { color: cssVar('--text') } },
+          tooltip: { callbacks: { label: c => ' ' + c.parsed.y.toLocaleString() + ' credits' } },
         },
       },
     });
 
-    function setText(id, val) { document.getElementById(id).textContent = val ?? '—'; }
+    // ── Stat helpers ─────────────────────────────────────────────
+    function setText(id, val) { document.getElementById(id).textContent = val != null ? val : '\u2014'; }
     function setClass(id, cls) {
       const el = document.getElementById(id);
       el.classList.remove('ok', 'warn', 'danger');
       if (cls) el.classList.add(cls);
     }
     function addWeekdays(start, weekdayDays) {
-      if (!(start instanceof Date) || Number.isNaN(start.getTime()) || weekdayDays == null || weekdayDays <= 0) {
-        return start;
-      }
+      if (!(start instanceof Date) || Number.isNaN(start.getTime()) || weekdayDays == null || weekdayDays <= 0) return start;
       const result = new Date(start.getTime());
       let remainingMs = weekdayDays * 86_400_000;
-
       while (remainingMs > 0) {
-        const dow = result.getDay(); // 0=Sun, 6=Sat
+        const dow = result.getDay();
         if (dow === 0 || dow === 6) {
-          const daysToMonday = dow === 6 ? 2 : 1;
-          result.setDate(result.getDate() + daysToMonday);
-          result.setHours(0, 0, 0, 0);
-          continue;
+          result.setDate(result.getDate() + (dow === 6 ? 2 : 1));
+          result.setHours(0, 0, 0, 0); continue;
         }
-
-        const nextMidnight = new Date(result);
-        nextMidnight.setHours(24, 0, 0, 0);
-        const availableMs = nextMidnight.getTime() - result.getTime();
-        const consume = Math.min(remainingMs, availableMs);
+        const nextMidnight = new Date(result); nextMidnight.setHours(24, 0, 0, 0);
+        const consume = Math.min(remainingMs, nextMidnight.getTime() - result.getTime());
         result.setTime(result.getTime() + consume);
         remainingMs -= consume;
       }
-
       return result;
     }
     function pctClass(pct)  { return pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : 'ok'; }
@@ -396,18 +545,12 @@
     function fmtDuration(seconds) {
       if (seconds == null) return 'unknown';
       if (seconds <= 0) return 'expired';
-      const d = Math.floor(seconds / 86400);
-      const h = Math.floor((seconds % 86400) / 3600);
-      const m = Math.floor((seconds % 3600) / 60);
-      if (d > 0) return `${d}d ${h}h ${m}m`;
-      if (h > 0) return `${h}h ${m}m`;
-      return `${m}m`;
+      const d = Math.floor(seconds / 86400), h = Math.floor((seconds % 86400) / 3600), m = Math.floor((seconds % 3600) / 60);
+      if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+      if (h > 0) return h + 'h ' + m + 'm';
+      return m + 'm';
     }
-    function showBanner(id, text) {
-      const el = document.getElementById(id);
-      el.textContent = text;
-      el.classList.remove('hidden');
-    }
+    function showBanner(id, text) { const el = document.getElementById(id); el.textContent = text; el.classList.remove('hidden'); }
     function hideBanner(id) { document.getElementById(id).classList.add('hidden'); }
     function updateSessionBadge(label, cls) {
       const badge = document.getElementById('session-badge');
@@ -416,204 +559,199 @@
       if (cls) badge.classList.add(cls);
     }
 
+    // ── Session toggle ───────────────────────────────────────────
     const sessionToggle = document.getElementById('session-toggle');
-    const sessionCards = document.getElementById('session-cards');
+    const sessionCards  = document.getElementById('session-cards');
     sessionToggle.addEventListener('click', () => {
       const expanded = sessionToggle.getAttribute('aria-expanded') === 'true';
       sessionToggle.setAttribute('aria-expanded', String(!expanded));
       sessionCards.classList.toggle('hidden', expanded);
     });
 
-    async function refresh() {
-      const {
-        chart: points,
-        latest_used,
-        quota,
-        latest_captured_at,
-        scan_interval_seconds,
-        stale_after_seconds,
-        data_age_seconds,
-        stale_data,
-        auth,
-        stats,
-      } = await fetch('/api/data').then(r => r.json());
+    // ── Date-range picker ────────────────────────────────────────
+    const inputFrom = document.getElementById('date-from');
+    const inputTo   = document.getElementById('date-to');
 
-      // Session cards and warnings
-      const authOk = !!auth?.authenticated;
+    function currentRange() {
+      return { from: inputFrom.value || null, to: inputTo.value || null };
+    }
+
+    inputFrom.addEventListener('change', () => refreshLineChart(currentRange()));
+    inputTo.addEventListener('change',   () => refreshLineChart(currentRange()));
+
+    document.getElementById('btn-clear-range').addEventListener('click', () => {
+      inputFrom.value = '';
+      inputTo.value   = '';
+      if (lastFullPoints) renderLineChart(lastFullPoints);
+    });
+
+    // ── Export buttons ───────────────────────────────────────────
+    function exportUrl(fmt) {
+      const { from, to } = currentRange();
+      const params = new URLSearchParams({ format: fmt });
+      if (from) params.set('from', from);
+      if (to)   params.set('to',   to);
+      return '/api/export?' + params;
+    }
+    document.getElementById('btn-export-json').addEventListener('click', () => { window.location.href = exportUrl('json'); });
+    document.getElementById('btn-export-csv').addEventListener('click',  () => { window.location.href = exportUrl('csv'); });
+
+    // ── Main data fetch ──────────────────────────────────────────
+    let lastFullPoints = null;
+
+    async function refresh() {
+      const data = await fetch('/api/data').then(r => r.json());
+      const { chart: points, latest_used, quota, latest_captured_at,
+              scan_interval_seconds, stale_after_seconds, data_age_seconds,
+              stale_data, auth, stats } = data;
+
+      lastFullPoints = points;
+
+      // Session
+      const authOk = !!auth && auth.authenticated;
       setText('val-auth', authOk ? 'active' : 'reauth needed');
       setText('val-auth-sub', authOk ? 'saved browser session is valid' : 'run login again');
       setClass('card-auth', authOk ? 'ok' : 'danger');
 
-      setText('val-expiry', fmtDuration(auth?.remaining_seconds));
-      setText('val-expiry-sub', auth?.estimated_expiry_utc ? `est. ${auth.estimated_expiry_utc}` : 'no cookie expiry available');
-      if (auth?.remaining_seconds == null) {
-        setClass('card-expiry', 'warn');
-      } else if (auth.remaining_seconds <= 0) {
-        setClass('card-expiry', 'danger');
-      } else if (auth.remaining_seconds <= 86400) {
-        setClass('card-expiry', 'warn');
-      } else {
-        setClass('card-expiry', 'ok');
-      }
+      setText('val-expiry', fmtDuration(auth && auth.remaining_seconds));
+      setText('val-expiry-sub', auth && auth.estimated_expiry_utc ? 'est. ' + auth.estimated_expiry_utc : 'no cookie expiry available');
+      const rem = auth && auth.remaining_seconds;
+      if (rem == null)        setClass('card-expiry', 'warn');
+      else if (rem <= 0)      setClass('card-expiry', 'danger');
+      else if (rem <= 86400)  setClass('card-expiry', 'warn');
+      else                    setClass('card-expiry', 'ok');
 
       setText('val-freshness', fmtDuration(data_age_seconds));
-      if (latest_captured_at) {
-        setText('val-freshness-sub', `last scrape ${latest_captured_at} (warn after ${fmtDuration(stale_after_seconds)})`);
-      } else {
-        setText('val-freshness-sub', 'no snapshots captured yet');
-      }
+      setText('val-freshness-sub', latest_captured_at
+        ? 'last scrape ' + latest_captured_at + ' (warn after ' + fmtDuration(stale_after_seconds) + ')'
+        : 'no snapshots captured yet');
       setClass('card-freshness', stale_data ? 'danger' : 'ok');
 
       if (!authOk) {
         showBanner('auth-warning', 'GitHub session is not authenticated. Scrapes may fail until users re-authenticate.');
-      } else {
-        hideBanner('auth-warning');
-      }
+      } else { hideBanner('auth-warning'); }
 
       if (stale_data) {
-        const every = fmtDuration(scan_interval_seconds);
-        const age = fmtDuration(data_age_seconds);
-        showBanner('stale-warning', `No fresh data detected. Last scrape age: ${age}. Expected at least one scrape every ${every}; warning threshold is 2x interval.`);
-      } else {
-        hideBanner('stale-warning');
-      }
+        showBanner('stale-warning', 'No fresh data detected. Last scrape age: ' + fmtDuration(data_age_seconds) + '. Expected at least one scrape every ' + fmtDuration(scan_interval_seconds) + '; warning threshold is 2x interval.');
+      } else { hideBanner('stale-warning'); }
 
-      let sessionState = 'ok';
-      let sessionLabel = 'Healthy';
-      if (!authOk || (auth?.remaining_seconds != null && auth.remaining_seconds <= 0) || stale_data) {
-        sessionState = 'danger';
-        sessionLabel = 'Needs attention';
-      } else if ((auth?.remaining_seconds != null && auth.remaining_seconds <= 86400) || data_age_seconds > Math.max(scan_interval_seconds, 0)) {
-        sessionState = 'warn';
-        sessionLabel = 'Check soon';
+      let sessionState = 'ok', sessionLabel = 'Healthy';
+      if (!authOk || (rem != null && rem <= 0) || stale_data) {
+        sessionState = 'danger'; sessionLabel = 'Needs attention';
+      } else if ((rem != null && rem <= 86400) || data_age_seconds > Math.max(scan_interval_seconds, 0)) {
+        sessionState = 'warn'; sessionLabel = 'Check soon';
       }
       updateSessionBadge(sessionLabel, sessionState);
 
       // This Cycle
-      setText('val-used',        latest_used?.toLocaleString());
-      setText('val-quota-sub',   quota != null ? `of ${quota.toLocaleString()} quota` : null);
-      setText('val-remaining',   stats.credits_remaining?.toLocaleString());
-      setText('val-remaining-sub', stats.cycle_reset_date ? `until ${stats.cycle_reset_date}` : null);
-      setText('val-days',        stats.days_remaining);
-      setText('val-reset-date',  stats.cycle_reset_date ? `resets ${stats.cycle_reset_date}` : null);
-
+      setText('val-used',          latest_used != null ? latest_used.toLocaleString() : null);
+      setText('val-quota-sub',     quota != null ? 'of ' + quota.toLocaleString() + ' quota' : null);
+      setText('val-remaining',     stats.credits_remaining != null ? stats.credits_remaining.toLocaleString() : null);
+      setText('val-remaining-sub', stats.cycle_reset_date ? 'until ' + stats.cycle_reset_date : null);
+      setText('val-days',          stats.days_remaining);
+      setText('val-reset-date',    stats.cycle_reset_date ? 'resets ' + stats.cycle_reset_date : null);
       if (latest_used != null && quota != null) {
         const pct = Math.round((latest_used / quota) * 100);
         setText('val-pct', pct + '%');
         document.getElementById('bar-used').style.width = Math.min(pct, 100) + '%';
         const cls = pctClass(pct);
-        setClass('card-used',      cls);
-        setClass('card-pct',       cls);
+        setClass('card-used', cls); setClass('card-pct', cls);
         setClass('card-remaining', pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : null);
       }
 
-      // Recompute today stats using local midnight (not UTC)
-      const localMidnight = new Date();
-      localMidnight.setHours(0, 0, 0, 0);
+      // Today (recompute from local midnight using unfiltered points)
+      const localMidnight = new Date(); localMidnight.setHours(0, 0, 0, 0);
       const todayPts = points.filter(p => new Date(p.x) >= localMidnight);
-
       if (todayPts.length >= 1) {
-        const firstVal = todayPts[0].y ?? 0;
-        const lastVal  = todayPts[todayPts.length - 1].y ?? 0;
-        stats.today_used = Math.max(0, lastVal - firstVal);
-      } else {
-        stats.today_used = null;
-      }
-
+        stats.today_used = Math.max(0, (todayPts[todayPts.length - 1].y || 0) - (todayPts[0].y || 0));
+      } else { stats.today_used = null; }
       if (todayPts.length >= 2) {
-        const t0 = new Date(todayPts[0].x);
-        const t1 = new Date(todayPts[todayPts.length - 1].x);
-        const elapsedHours = (t1 - t0) / 3_600_000;
+        const elapsedHours = (new Date(todayPts[todayPts.length - 1].x) - new Date(todayPts[0].x)) / 3_600_000;
         if (elapsedHours >= 1) {
-          const elapsedDays = elapsedHours / 24;
-          const usedDelta = (todayPts[todayPts.length - 1].y ?? 0) - (todayPts[0].y ?? 0);
-          stats.burn_24h = Math.round(usedDelta / elapsedDays * 10) / 10;
-          const q = todayPts[todayPts.length - 1].quota;
-          const lu = todayPts[todayPts.length - 1].y;
+          const usedDelta = (todayPts[todayPts.length - 1].y || 0) - (todayPts[0].y || 0);
+          stats.burn_24h = Math.round(usedDelta / (elapsedHours / 24) * 10) / 10;
+          const q = todayPts[todayPts.length - 1].quota, lu = todayPts[todayPts.length - 1].y;
           if (stats.burn_24h > 0 && q != null && lu != null) {
-            const remaining = q - lu;
-            stats.days_to_exhaustion_24h = Math.round(remaining / stats.burn_24h * 10) / 10;
+            stats.days_to_exhaustion_24h = Math.round((q - lu) / stats.burn_24h * 10) / 10;
             const exDate24h = addWeekdays(new Date(), stats.days_to_exhaustion_24h);
             stats.exhaustion_date_24h = exDate24h.toLocaleDateString('en-CA');
             const resetDate = stats.cycle_reset_date ? new Date(stats.cycle_reset_date + 'T00:00:00') : null;
             stats.exhausts_before_reset_24h = resetDate != null && exDate24h < resetDate;
-          } else {
-            stats.days_to_exhaustion_24h = null;
-            stats.exhaustion_date_24h = null;
-            stats.exhausts_before_reset_24h = false;
-          }
-        } else {
-          stats.burn_24h = null;
-          stats.days_to_exhaustion_24h = null;
-          stats.exhaustion_date_24h = null;
-          stats.exhausts_before_reset_24h = false;
-        }
-      } else {
-        stats.burn_24h = null;
-        stats.days_to_exhaustion_24h = null;
-        stats.exhaustion_date_24h = null;
-        stats.exhausts_before_reset_24h = false;
-      }
+          } else { stats.days_to_exhaustion_24h = null; stats.exhaustion_date_24h = null; stats.exhausts_before_reset_24h = false; }
+        } else { stats.burn_24h = null; stats.days_to_exhaustion_24h = null; stats.exhaustion_date_24h = null; stats.exhausts_before_reset_24h = false; }
+      } else { stats.burn_24h = null; stats.days_to_exhaustion_24h = null; stats.exhaustion_date_24h = null; stats.exhausts_before_reset_24h = false; }
 
-      // Today
       setText('val-today',      stats.today_used != null ? stats.today_used.toLocaleString() : null);
-      setText('val-burn-today', stats.burn_24h   != null ? stats.burn_24h.toLocaleString()   : '—');
+      setText('val-burn-today', stats.burn_24h   != null ? stats.burn_24h.toLocaleString()   : '\u2014');
       setClass('card-exhaust-today', exClass(stats.days_to_exhaustion_24h, stats.days_remaining));
       if (stats.days_to_exhaustion_24h != null) {
         setText('val-exhaust-today-days', stats.days_to_exhaustion_24h + ' weekdays');
-        setText('val-exhaust-today-date',
-          stats.exhausts_before_reset_24h
-            ? `⚠ before reset on ${stats.cycle_reset_date}`
-            : `est. ${stats.exhaustion_date_24h}`);
+        setText('val-exhaust-today-date', stats.exhausts_before_reset_24h ? '\u26A0 before reset on ' + stats.cycle_reset_date : 'est. ' + stats.exhaustion_date_24h);
       } else {
-        setText('val-exhaust-today-days', '∞');
+        setText('val-exhaust-today-days', '\u221E');
         setText('val-exhaust-today-date', 'need 1h of data to project');
       }
 
       // Forecast
       setText('val-burn',   stats.daily_burn_rate != null ? stats.daily_burn_rate.toLocaleString() : null);
       setText('val-budget', stats.budget_per_day  != null ? stats.budget_per_day.toLocaleString()  : null);
-
       if (stats.projected_at_reset != null && quota != null) {
         setText('val-projected', stats.projected_at_reset.toLocaleString());
-        setText('val-projected-sub',
-          stats.projected_over_quota
-            ? `⚠ ${(stats.projected_at_reset - quota).toLocaleString()} over quota`
-            : `${(quota - stats.projected_at_reset).toLocaleString()} under quota`);
+        setText('val-projected-sub', stats.projected_over_quota
+          ? '\u26A0 ' + (stats.projected_at_reset - quota).toLocaleString() + ' over quota'
+          : (quota - stats.projected_at_reset).toLocaleString() + ' under quota');
         setClass('card-projected', stats.projected_over_quota ? 'danger' : 'ok');
       }
-
       setClass('card-exhaust', exClass(stats.days_to_exhaustion, stats.days_remaining));
       if (stats.days_to_exhaustion != null) {
         setText('val-exhaust-days', stats.days_to_exhaustion + ' weekdays');
-        setText('val-exhaust-date',
-          stats.exhausts_before_reset
-            ? `⚠ before reset on ${stats.cycle_reset_date}`
-            : `est. ${stats.exhaustion_date}`);
+        setText('val-exhaust-date', stats.exhausts_before_reset ? '\u26A0 before reset on ' + stats.cycle_reset_date : 'est. ' + stats.exhaustion_date);
       } else {
-        setText('val-exhaust-days', '∞');
+        setText('val-exhaust-days', '\u221E');
         setText('val-exhaust-date', 'at current rate');
       }
 
-      // Line chart — compress flat periods
+      // Update line chart; respect any active date range filter
+      const { from, to } = currentRange();
+      if (from || to) {
+        refreshLineChart({ from, to });
+      } else {
+        renderLineChart(points);
+      }
+
+      document.getElementById('status').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+    }
+
+    async function refreshLineChart({ from, to }) {
+      let points;
+      if (from || to) {
+        const params = new URLSearchParams();
+        if (from) params.set('from', from);
+        if (to)   params.set('to',   to);
+        const d = await fetch('/api/data?' + params).then(r => r.json());
+        points = d.chart;
+      } else {
+        points = lastFullPoints;
+      }
+      if (points) renderLineChart(points);
+    }
+
+    function renderLineChart(points) {
       const { labels: cLabels, usage: cUsage, quota: cQuota } = buildCompressedChart(points);
-      lineChart.data.labels = cLabels;
+      lineChart.data.labels   = cLabels;
       lineChart.data.datasets = [
         { label: 'AI Credits Used', data: cUsage, borderColor: '#58a6ff',
           backgroundColor: 'rgba(88,166,255,0.10)', fill: true, tension: 0.3,
-          spanGaps: false,
-          pointRadius: cUsage.length < 60 ? 3 : 0, borderWidth: 2 },
+          spanGaps: false, pointRadius: cUsage.length < 60 ? 3 : 0, borderWidth: 2 },
         { label: 'Quota', data: cQuota, borderColor: '#f85149',
           borderDash: [6,4], borderWidth: 1.5, pointRadius: 0, fill: false, spanGaps: false },
       ];
       lineChart.update('none');
-
-      document.getElementById('status').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
     }
 
     async function refreshDaily() {
       const tzOffset = new Date().getTimezoneOffset();
-      const days = await fetch(`/api/daily?tz_offset_minutes=${tzOffset}`).then(r => r.json());
+      const days = await fetch('/api/daily?tz_offset_minutes=' + tzOffset).then(r => r.json());
       barChart.data.labels   = days.map(d => d.date);
       barChart.data.datasets = [{
         label: 'Credits consumed per weekday (last 30 weekdays)',
@@ -626,8 +764,8 @@
 
     refresh();
     refreshDaily();
-    setInterval(refresh,       30_000);
-    setInterval(refreshDaily,  60_000);
+    setInterval(refresh,      30_000);
+    setInterval(refreshDaily, 60_000);
   </script>
 </body>
 </html>
