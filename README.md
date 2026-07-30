@@ -155,6 +155,7 @@ All endpoints are served by the Flask app on the configured `PORT`.
 | Endpoint | Method | Description |
 |---|---|---|
 | `GET /api/data` | `?from=` / `?to=` | Full stats payload + chart data (cached 10 s by default; cache bypassed when date params are present) |
+| `GET /api/data/updates` | `?since=` | Incremental update payload: fresh stats/session fields + `chart_append` points newer than `since` |
 | `GET /api/daily` | `?tz_offset_minutes=` | Credits consumed per weekday for the last 30 weekdays with data |
 | `GET /api/export` | `?format=csv\|json` + `?from=` / `?to=` | Download all snapshots as a file (`Content-Disposition: attachment`) |
 

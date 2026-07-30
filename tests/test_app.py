@@ -161,6 +161,53 @@ def test_api_data_date_range_filter(monkeypatch):
     assert "2026-07-29" not in chart_dates
 
 
+def test_api_data_updates_since_returns_only_new_rows(monkeypatch):
+    rows = [
+        {"captured_at": "2026-07-01T12:00:00+00:00", "used": 100, "quota": 12000, "raw_text": ""},
+        {"captured_at": "2026-07-15T12:00:00+00:00", "used": 200, "quota": 12000, "raw_text": ""},
+        {"captured_at": "2026-07-29T12:00:00+00:00", "used": 300, "quota": 12000, "raw_text": ""},
+    ]
+
+    monkeypatch.setattr(app.db, "query_history", lambda **_: rows)
+    monkeypatch.setattr(app.scraper, "get_auth_status", lambda **_: {
+        "authenticated": True,
+        "estimated_expiry_utc": None,
+        "remaining_seconds": 99999,
+        "expiry_source_cookie": None,
+        "estimate_note": "",
+    })
+
+    with app.app.test_client() as client:
+        resp = client.get("/api/data/updates?since=2026-07-10T00:00:00+00:00")
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert "chart" not in payload
+    assert [p["x"] for p in payload["chart_append"]] == [
+        "2026-07-15T12:00:00+00:00",
+        "2026-07-29T12:00:00+00:00",
+    ]
+    assert payload["latest_captured_at"] == "2026-07-29T12:00:00+00:00"
+
+
+def test_api_data_updates_requires_valid_since(monkeypatch):
+    monkeypatch.setattr(app.db, "query_history", lambda **_: [])
+    monkeypatch.setattr(app.scraper, "get_auth_status", lambda **_: {
+        "authenticated": True,
+        "estimated_expiry_utc": None,
+        "remaining_seconds": 99999,
+        "expiry_source_cookie": None,
+        "estimate_note": "",
+    })
+
+    with app.app.test_client() as client:
+        resp_missing = client.get("/api/data/updates")
+        resp_invalid = client.get("/api/data/updates?since=not-a-date")
+
+    assert resp_missing.status_code == 400
+    assert resp_invalid.status_code == 400
+
+
 def test_api_export_csv(monkeypatch):
     rows = [
         {"captured_at": "2026-07-01T00:00:00+00:00", "metric_name": "ai_credits",

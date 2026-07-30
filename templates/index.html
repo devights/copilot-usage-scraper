@@ -599,7 +599,7 @@
     document.getElementById('btn-clear-range').addEventListener('click', () => {
       inputFrom.value = '';
       inputTo.value   = '';
-      if (lastFullPoints) renderLineChart(lastFullPoints);
+      if (allPoints) renderLineChart(allPoints);
     });
 
     // ── Export buttons ───────────────────────────────────────────
@@ -614,15 +614,55 @@
     document.getElementById('btn-export-csv').addEventListener('click',  () => { window.location.href = exportUrl('csv'); });
 
     // ── Main data fetch ──────────────────────────────────────────
-    let lastFullPoints = null;
+    let allPoints = null;
+
+    function dateRangeBounds({ from, to }) {
+      const fromDate = from ? new Date(from + 'T00:00:00') : null;
+      const toDate = to ? new Date(to + 'T23:59:59.999') : null;
+      return { fromDate, toDate };
+    }
+
+    function filterPointsByRange(points, range) {
+      if (!points) return [];
+      const { fromDate, toDate } = dateRangeBounds(range);
+      return points.filter((p) => {
+        const d = new Date(p.x);
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      });
+    }
+
+    function appendNewPoints(points) {
+      if (!Array.isArray(points) || points.length === 0) return;
+      if (!allPoints) allPoints = [];
+      for (const p of points) {
+        allPoints.push(p);
+      }
+      allPoints.sort((a, b) => new Date(a.x) - new Date(b.x));
+    }
 
     async function refresh() {
-      const data = await fetch('/api/data').then(r => r.json());
-      const { chart: points, latest_used, quota, latest_captured_at,
+      let data;
+      if (!allPoints) {
+        data = await fetch('/api/data').then(r => r.json());
+        allPoints = data.chart || [];
+      } else {
+        const lastPoint = allPoints[allPoints.length - 1];
+        if (lastPoint && lastPoint.x) {
+          const params = new URLSearchParams({ since: lastPoint.x });
+          data = await fetch('/api/data/updates?' + params).then(r => r.json());
+          appendNewPoints(data.chart_append);
+        } else {
+          data = await fetch('/api/data').then(r => r.json());
+          allPoints = data.chart || [];
+        }
+      }
+
+      const points = allPoints || [];
+      const { latest_used, quota, latest_captured_at,
               scan_interval_seconds, stale_after_seconds, data_age_seconds,
               stale_data, auth, stats } = data;
-
-      lastFullPoints = points;
 
       // Session
       const authOk = !!auth && auth.authenticated;
@@ -740,17 +780,11 @@
     }
 
     async function refreshLineChart({ from, to }) {
-      let points;
       if (from || to) {
-        const params = new URLSearchParams();
-        if (from) params.set('from', from);
-        if (to)   params.set('to',   to);
-        const d = await fetch('/api/data?' + params).then(r => r.json());
-        points = d.chart;
+        renderLineChart(filterPointsByRange(allPoints || [], { from, to }));
       } else {
-        points = lastFullPoints;
+        renderLineChart(allPoints || []);
       }
-      if (points) renderLineChart(points);
     }
 
     function renderLineChart(points) {

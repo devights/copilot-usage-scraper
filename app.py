@@ -226,6 +226,74 @@ def _parse_iso_utc(ts: str | None) -> datetime | None:
         return None
 
 
+def _rows_after_timestamp(rows: list[dict], since_ts: str) -> list[dict]:
+    """Return rows with captured_at strictly newer than the given timestamp."""
+    since_dt = _parse_iso_utc(since_ts)
+    if since_dt is None:
+        return []
+
+    out: list[dict] = []
+    for row in rows:
+        row_dt = _parse_iso_utc(row.get("captured_at"))
+        if row_dt is not None and row_dt > since_dt:
+            out.append(row)
+    return out
+
+
+def _build_usage_payload(
+    all_rows: list[dict],
+    chart_rows: list[dict],
+    *,
+    include_chart: bool = True,
+) -> dict:
+    """Build the standard API payload for usage + forecast + session status."""
+    stats = _burndown_stats(all_rows)
+
+    latest = all_rows[-1] if all_rows else {}
+
+    latest_ts = _parse_iso_utc(latest.get("captured_at"))
+    now = datetime.now(timezone.utc)
+    interval_seconds = _env_int("SCAN_INTERVAL", 120)
+    stale_after_seconds = interval_seconds * 2
+    age_seconds = None
+    if latest_ts is not None:
+        age_seconds = int((now - latest_ts).total_seconds())
+    stale_data = age_seconds is None or age_seconds > stale_after_seconds
+
+    auth = scraper.get_auth_status(
+        timeout_ms=_AUTH_CHECK_TIMEOUT_MS,
+        cache_ttl_seconds=_AUTH_STATUS_CACHE_SECONDS,
+    )
+    auth_payload = {
+        "authenticated": auth["authenticated"],
+        "estimated_expiry_utc": (
+            auth["estimated_expiry_utc"].isoformat() if auth["estimated_expiry_utc"] else None
+        ),
+        "remaining_seconds": auth["remaining_seconds"],
+        "note": auth["estimate_note"],
+    }
+
+    payload = {
+        "latest_used": latest.get("used"),
+        "quota": latest.get("quota"),
+        "latest_captured_at": latest.get("captured_at"),
+        "scan_interval_seconds": interval_seconds,
+        "stale_after_seconds": stale_after_seconds,
+        "data_age_seconds": age_seconds,
+        "stale_data": stale_data,
+        "auth": auth_payload,
+        "stats": stats,
+    }
+
+    if include_chart:
+        payload["chart"] = [
+            {"x": r["captured_at"], "y": r["used"], "quota": r["quota"]}
+            for r in chart_rows
+        ]
+
+    return payload
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -254,7 +322,6 @@ def api_data():
     all_rows = db.query_history(metric_name="ai_credits", limit=5000)
     all_rows = [r for r in all_rows if r["used"] is not None]
     all_rows.sort(key=lambda r: r["captured_at"])
-    stats = _burndown_stats(all_rows)
 
     # Chart data is filtered by the requested date range (or full if no filter).
     if filtered:
@@ -265,52 +332,44 @@ def api_data():
         chart_rows.sort(key=lambda r: r["captured_at"])
     else:
         chart_rows = all_rows
+    payload = _build_usage_payload(all_rows, chart_rows, include_chart=True)
 
-    chart_data = [
-        {"x": r["captured_at"], "y": r["used"], "quota": r["quota"]}
-        for r in chart_rows
-    ]
-
-    latest = all_rows[-1] if all_rows else {}
-
-    latest_ts = _parse_iso_utc(latest.get("captured_at"))
-    now = datetime.now(timezone.utc)
-    interval_seconds = _env_int("SCAN_INTERVAL", 120)
-    stale_after_seconds = interval_seconds * 2
-    age_seconds = None
-    if latest_ts is not None:
-        age_seconds = int((now - latest_ts).total_seconds())
-    stale_data = age_seconds is None or age_seconds > stale_after_seconds
-
-    auth = scraper.get_auth_status(
-        timeout_ms=_AUTH_CHECK_TIMEOUT_MS,
-        cache_ttl_seconds=_AUTH_STATUS_CACHE_SECONDS,
-    )
-    auth_payload = {
-        "authenticated": auth["authenticated"],
-        "estimated_expiry_utc": (
-            auth["estimated_expiry_utc"].isoformat() if auth["estimated_expiry_utc"] else None
-        ),
-        "remaining_seconds": auth["remaining_seconds"],
-        "note": auth["estimate_note"],
-    }
-
-    payload = {
-        "chart": chart_data,
-        "latest_used": latest.get("used"),
-        "quota": latest.get("quota"),
-        "latest_captured_at": latest.get("captured_at"),
-        "scan_interval_seconds": interval_seconds,
-        "stale_after_seconds": stale_after_seconds,
-        "data_age_seconds": age_seconds,
-        "stale_data": stale_data,
-        "auth": auth_payload,
-        "stats": stats,
-    }
     if not filtered:
         with _API_DATA_CACHE_LOCK:
             _API_DATA_CACHE["cached_at_epoch"] = now_epoch
             _API_DATA_CACHE["payload"] = payload
+    return jsonify(payload)
+
+
+@app.route("/api/data/updates")
+def api_data_updates():
+    """Return incremental chart points plus fresh stats/session summary.
+
+    Query params:
+      since   ISO date/datetime string used as an exclusive lower bound
+    """
+    since_ts_raw = request.args.get("since")
+    if not since_ts_raw:
+        return jsonify({"error": "missing required query param: since"}), 400
+
+    # Some clients send a literal '+' in timezone offsets without URL-encoding,
+    # which Flask decodes as a space. Normalize this to keep the API forgiving.
+    since_ts = since_ts_raw.strip().replace(" ", "+")
+    if _parse_iso_utc(since_ts) is None:
+        return jsonify({"error": "invalid since timestamp; expected ISO-8601"}), 400
+
+    all_rows = db.query_history(metric_name="ai_credits", limit=5000)
+    all_rows = [r for r in all_rows if r["used"] is not None]
+    all_rows.sort(key=lambda r: r["captured_at"])
+
+    new_rows = _rows_after_timestamp(all_rows, since_ts)
+    payload = _build_usage_payload(all_rows, new_rows, include_chart=False)
+    payload["chart_append"] = [
+        {"x": r["captured_at"], "y": r["used"], "quota": r["quota"]}
+        for r in new_rows
+    ]
+    payload["since"] = since_ts
+
     return jsonify(payload)
 
 
