@@ -19,8 +19,10 @@ COPILOT_URL = "https://github.com/settings/copilot/features"
 STATE_DIR = Path(os.environ.get("BROWSER_STATE_DIR", Path.home() / ".config" / "gh-scraper" / "browser-state"))
 DEBUG_HTML = Path(__file__).parent / "debug_page.html"
 
-# Matches "6,841 / 12,000 AI credits"
+# Matches "6,841 / 12,000 AI credits" (quota present)
 _CREDITS_RE = re.compile(r"([\d,]+)\s*/\s*([\d,]+)\s+AI credits", re.IGNORECASE)
+# Matches "951 AI credits used" (no quota set)
+_CREDITS_USED_RE = re.compile(r"([\d,]+)\s+AI credits used", re.IGNORECASE)
 _AUTH_URL_MARKERS = ("login", "signin", "session")
 _AUTH_COOKIE_PRIORITY = (
     "user_session",
@@ -44,19 +46,33 @@ def _parse_int(text: str) -> int | None:
 def _extract_metrics_from_html(page) -> list[dict]:
     """
     Extract AI credit usage from the 'Usage this cycle' section.
-    Selector: the muted span that contains 'X,XXX / XX,XXX AI credits'.
+    Handles two formats:
+      - quota present:  "6,841 / 12,000 AI credits"
+      - no quota:       "951 AI credits used" (quota stored as None)
     """
     metrics: list[dict] = []
 
-    # Primary: find the span with "X / Y AI credits" text
     for el in page.query_selector_all("span.color-fg-muted"):
         text = el.inner_text().strip()
+
+        # Quota present: "X / Y AI credits"
         m = _CREDITS_RE.search(text)
         if m:
             metrics.append({
                 "metric_name": "ai_credits",
                 "used": _parse_int(m.group(1)),
                 "quota": _parse_int(m.group(2)),
+                "raw_text": text,
+            })
+            break
+
+        # No quota: "X AI credits used"
+        m2 = _CREDITS_USED_RE.search(text)
+        if m2:
+            metrics.append({
+                "metric_name": "ai_credits",
+                "used": _parse_int(m2.group(1)),
+                "quota": None,
                 "raw_text": text,
             })
             break

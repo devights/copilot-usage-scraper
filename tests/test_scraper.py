@@ -157,6 +157,16 @@ def test_extract_metrics_found():
     assert "6,841" in metrics[0]["raw_text"]
 
 
+def test_extract_metrics_no_quota():
+    """Handles 'X AI credits used' format when no quota is set."""
+    page = _MockPage([_MockElement("951 AI credits used")])
+    metrics = scraper._extract_metrics_from_html(page)
+    assert len(metrics) == 1
+    assert metrics[0]["used"] == 951
+    assert metrics[0]["quota"] is None
+    assert "951" in metrics[0]["raw_text"]
+
+
 def test_extract_metrics_no_match():
     page = _MockPage([_MockElement("Some unrelated text")])
     assert scraper._extract_metrics_from_html(page) == []

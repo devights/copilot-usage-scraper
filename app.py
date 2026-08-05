@@ -124,7 +124,9 @@ def _burndown_stats(rows: list[dict]) -> dict:
     days_in_cycle_elapsed = _weekday_seconds_between(cycle_start, now) / 86400
     days_until_reset = _weekday_seconds_between(now, cycle_end) / 86400
 
-    if not cycle_rows or days_in_cycle_elapsed < 1 / 1440:
+    # Require at least 1 weekday-hour of data before computing a burn rate,
+    # matching the burn_24h guard and preventing absurd rates at cycle start.
+    if not cycle_rows or days_in_cycle_elapsed < 1 / 24:
         return {
             "daily_burn_rate": None,
             "days_remaining": round(days_until_reset, 1),
@@ -187,7 +189,9 @@ def _burndown_stats(rows: list[dict]) -> dict:
 
     budget_per_day = None
     if credits_remaining is not None and days_until_reset > 0:
-        budget_per_day = round(credits_remaining / days_until_reset, 1)
+        # Cap at credits_remaining: near end-of-cycle days_until_reset → 0
+        # which makes the raw division explode above the total quota.
+        budget_per_day = round(min(credits_remaining / days_until_reset, credits_remaining), 1)
 
     projected_at_reset = None
     projected_over_quota = False
@@ -397,7 +401,7 @@ def api_daily():
 
     # Group by local weekday date string (YYYY-MM-DD)
     from collections import defaultdict
-    by_day: dict[str, list[int]] = defaultdict(list)
+    by_day: dict[str, list[tuple]] = defaultdict(list)
     for r in rows:
         dt = _parse_iso_utc(r["captured_at"])
         if dt is None:
@@ -406,20 +410,48 @@ def api_daily():
         if local_dt.weekday() >= 5:
             continue
         day = local_dt.strftime("%Y-%m-%d")
-        by_day[day].append(r["used"])
+        by_day[day].append((local_dt, r["used"]))
 
     # Credits used each day = max - min within that day
-    # Ignore days where the counter reset (day min drops below previous day max).
+    # active_hours: cluster credit-increase timestamps; gaps > 2h between increases start a new
+    # working window. Sum each window's span (first increase → last increase within it).
     result = []
     previous_day_max = None
     for day in sorted(by_day):
-        vals = by_day[day]
+        entries = sorted(by_day[day], key=lambda e: e[0])
+        vals = [v for _, v in entries]
         day_min = min(vals)
         day_max = max(vals)
         if previous_day_max is not None and day_min < previous_day_max:
             previous_day_max = day_max
             continue
-        result.append({"date": day, "credits": day_max - day_min})
+        credits = day_max - day_min
+
+        active_times = [
+            entries[j][0]
+            for j in range(1, len(entries))
+            if entries[j][1] > entries[j - 1][1]
+        ]
+
+        active_seconds = 0.0
+        if active_times:
+            w_start = active_times[0]
+            w_end   = active_times[0]
+            for t in active_times[1:]:
+                if (t - w_end).total_seconds() > 7200:
+                    active_seconds += (w_end - w_start).total_seconds()
+                    w_start = t
+                w_end = t
+            active_seconds += (w_end - w_start).total_seconds()
+
+        active_hours = round(active_seconds / 3600, 1)
+        credits_per_hour = round(credits / active_hours, 1) if active_hours > 0 else None
+        result.append({
+            "date": day,
+            "credits": credits,
+            "active_hours": active_hours,
+            "credits_per_hour": credits_per_hour,
+        })
         previous_day_max = day_max
 
     return jsonify(result[-30:])

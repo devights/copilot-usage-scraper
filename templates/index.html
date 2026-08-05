@@ -515,17 +515,85 @@
       },
     });
 
+    const barLabelPlugin = {
+      id: 'barLabel',
+      afterDatasetsDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        if (!x || !y) return;
+        const meta = chart.getDatasetMeta(0);
+        const days = chart._dailyData || [];
+        meta.data.forEach((bar, i) => {
+          const d = days[i];
+          if (!d) return;
+          const lines = [
+            d.active_hours != null ? d.active_hours + 'h active' : null,
+            d.credits_per_hour != null ? d.credits_per_hour + ' cr/h' : null,
+          ].filter(Boolean);
+          if (lines.length === 0) return;
+
+          ctx.save();
+          ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+
+          const lineH = 13;
+          const padding = 4;
+          const maxW = lines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+          const bw = maxW + padding * 2;
+          const bh = lines.length * lineH + padding * 2;
+          const bx = bar.x - bw / 2;
+          const by = bar.y - bh - 4;
+          const r = 3;
+
+          ctx.fillStyle = cssVar('--surface');
+          ctx.strokeStyle = cssVar('--border');
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(bx + r, by);
+          ctx.lineTo(bx + bw - r, by);
+          ctx.arcTo(bx + bw, by, bx + bw, by + r, r);
+          ctx.lineTo(bx + bw, by + bh - r);
+          ctx.arcTo(bx + bw, by + bh, bx + bw - r, by + bh, r);
+          ctx.lineTo(bx + r, by + bh);
+          ctx.arcTo(bx, by + bh, bx, by + bh - r, r);
+          ctx.lineTo(bx, by + r);
+          ctx.arcTo(bx, by, bx + r, by, r);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = cssVar('--text-muted');
+          lines.forEach((line, li) => {
+            ctx.fillText(line, bar.x, by + padding + (li + 1) * lineH);
+          });
+          ctx.restore();
+        });
+      },
+    };
+
     const barChart = new Chart(document.getElementById('chart-daily').getContext('2d'), {
       type: 'bar', data: { datasets: [] },
+      plugins: [barLabelPlugin],
       options: {
         responsive: true,
+        layout: { padding: { top: 48 } },
         scales: {
           x: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid') } },
           y: { beginAtZero: true, ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid') }, title: { display: true, text: 'Credits consumed', color: cssVar('--text-muted') } },
         },
         plugins: {
           legend: { labels: { color: cssVar('--text') } },
-          tooltip: { callbacks: { label: c => ' ' + c.parsed.y.toLocaleString() + ' credits' } },
+          tooltip: {
+            callbacks: {
+              label: c => {
+                const d = (c.chart._dailyData || [])[c.dataIndex];
+                const lines = [' ' + c.parsed.y.toLocaleString() + ' credits'];
+                if (d?.active_hours != null) lines.push(' ' + d.active_hours + 'h active');
+                if (d?.credits_per_hour != null) lines.push(' ' + d.credits_per_hour + ' credits/hour');
+                return lines;
+              },
+            },
+          },
         },
       },
     });
@@ -803,6 +871,7 @@
     async function refreshDaily() {
       const tzOffset = new Date().getTimezoneOffset();
       const days = await fetch('/api/daily?tz_offset_minutes=' + tzOffset).then(r => r.json());
+      barChart._dailyData    = days;
       barChart.data.labels   = days.map(d => d.date);
       barChart.data.datasets = [{
         label: 'Credits consumed per weekday (last 30 weekdays)',
