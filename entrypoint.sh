@@ -29,7 +29,7 @@ case "$1" in
       sleep 0.2; i=$((i+1))
     done
 
-    x11vnc -display :99 -nopw -listen localhost -rfbport "${VNC_PORT}" \
+    x11vnc -display :99 -nopw -rfbport "${VNC_PORT}" \
            -forever -shared -quiet &
     VNC_PID=$!
 
