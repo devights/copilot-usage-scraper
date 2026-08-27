@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from playwright.sync_api import TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright
 
 COPILOT_URL = "https://github.com/settings/copilot/features"
 STATE_DIR = Path(os.environ.get("BROWSER_STATE_DIR", Path.home() / ".config" / "gh-scraper" / "browser-state"))
@@ -41,6 +42,20 @@ _AUTH_CACHE: dict = {
 def _parse_int(text: str) -> int | None:
     cleaned = text.replace(",", "").strip()
     return int(cleaned) if cleaned.isdigit() else None
+
+
+def _apply_quota_override(metrics: list[dict]) -> list[dict]:
+    value = os.environ.get("QUOTA_OVERRIDE")
+    if value is None or not value.strip():
+        return metrics
+
+    quota = _parse_int(value)
+    if quota is None or quota <= 0:
+        raise ValueError("QUOTA_OVERRIDE must be a positive integer")
+
+    for metric in metrics:
+        metric["quota"] = quota
+    return metrics
 
 
 def _extract_metrics_from_html(page) -> list[dict]:
@@ -81,10 +96,7 @@ def _extract_metrics_from_html(page) -> list[dict]:
 
 
 def _is_login_redirect(url: str) -> bool:
-    try:
-        path = urlparse(url).path.rstrip("/")
-    except Exception:
-        return False
+    path = urlparse(url).path.rstrip("/")
     return any(path == f"/{m}" or path.startswith(f"/{m}/") for m in _AUTH_URL_MARKERS)
 
 
@@ -236,7 +248,7 @@ def scrape(*, headless: bool = True, debug: bool = False) -> list[dict]:
             DEBUG_HTML.write_text(page.content(), encoding="utf-8")
             print(f"  Debug HTML saved to {DEBUG_HTML}")
 
-        metrics = _extract_metrics_from_html(page)
+        metrics = _apply_quota_override(_extract_metrics_from_html(page))
         browser.close()
 
     return metrics

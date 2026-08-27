@@ -5,10 +5,9 @@ import io
 import os
 import threading
 import time
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, render_template, request, Response
+from flask import Flask, Response, jsonify, render_template, request
 
 import db
 import scraper
@@ -526,4 +525,4 @@ def api_errors():
 
 if __name__ == "__main__":
     _bind_host = os.environ.get("BIND_HOST", "127.0.0.1")
-    app.run(debug=False, host=_bind_host, port=int(os.environ.get("PORT", 5000)))
+    app.run(debug=False, host=_bind_host, port=int(os.environ.get("PORT", "5000")))

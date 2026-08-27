@@ -16,7 +16,6 @@ import os
 import sys
 import time
 from datetime import timedelta
-from pathlib import Path
 
 import db
 import scraper
@@ -37,13 +36,13 @@ def cmd_watch(args) -> None:
                         print(f"  {m['metric_name']}: {m['used']}{quota_str}")
                 else:
                     print("  [WARN] No metrics found this cycle.", file=sys.stderr)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 error_type = type(exc).__name__
                 print(f"  [ERROR] {error_type}: {exc}", file=sys.stderr)
                 try:
                     db.log_scrape_error(str(exc), error_type=error_type)
-                except Exception:
-                    pass
+                except Exception as log_exc:  # noqa: BLE001
+                    print(f"  [WARN] Failed to log scrape error: {log_exc}", file=sys.stderr)
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\nStopped.")
@@ -58,7 +57,7 @@ def cmd_scrape(args) -> None:
     print("Scraping Copilot usage…")
     try:
         metrics = scraper.scrape(headless=not args.visible, debug=args.debug)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         error_type = type(exc).__name__
         print(f"  [ERROR] {error_type}: {exc}", file=sys.stderr)
         db.log_scrape_error(str(exc), error_type=error_type)
@@ -139,7 +138,7 @@ def main() -> None:
 
     # watch
     p_watch = sub.add_parser("watch", help="Scrape repeatedly on an interval (default 60s).")
-    p_watch.add_argument("--interval", type=int, default=int(os.environ.get("SCAN_INTERVAL", 60)), metavar="SECONDS",
+    p_watch.add_argument("--interval", type=int, default=int(os.environ.get("SCAN_INTERVAL", "60")), metavar="SECONDS",
                          help="Seconds between scrapes (default: 60).")
 
     # login

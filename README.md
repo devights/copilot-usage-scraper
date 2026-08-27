@@ -58,10 +58,15 @@ All settings are controlled via environment variables (set in `.env` or passed d
 | `PORT` | `5000` | Port Flask listens on inside the container |
 | `DATA_DIR` | `./data` | Host directory for `usage.db` and browser session |
 | `SCAN_INTERVAL` | `120` | Seconds between scrapes |
+| `QUOTA_OVERRIDE` | unset | Positive integer quota to use instead of the value shown by GitHub |
 | `VNC_PORT` | `5900` | VNC port used during the one-shot `login` helper |
 | `API_DATA_CACHE_SECONDS` | `10` | TTL for the `/api/data` in-process cache |
 | `AUTH_STATUS_CACHE_SECONDS` | `300` | TTL for the auth-status in-process cache |
 | `AUTH_CHECK_TIMEOUT_MS` | `2500` | Browser timeout when checking auth status |
+
+When `QUOTA_OVERRIDE` is set, each new snapshot stores that quota even when
+GitHub omits or displays a different quota. Remaining credits, budgets, and
+forecasts use the override after the next successful scrape.
 
 ### Useful commands
 

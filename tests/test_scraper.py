@@ -1,10 +1,11 @@
 """Tests for scraper.py — pure functions and Playwright-mocked integration paths."""
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 import scraper
-
 
 # ── _parse_int ────────────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ def _make_browser_mock(url="https://github.com/settings/copilot/features", eleme
 
 def test_scrape_success(tmp_path, monkeypatch):
     monkeypatch.setattr(scraper, "STATE_DIR", tmp_path)
-    pw, browser, page = _make_browser_mock()
+    pw, browser, _page = _make_browser_mock()
 
     with patch("scraper.sync_playwright") as mock_ctx:
         mock_ctx.return_value.__enter__.return_value = pw
@@ -223,9 +224,43 @@ def test_scrape_success(tmp_path, monkeypatch):
     browser.close.assert_called_once()
 
 
+def test_scrape_uses_quota_override_when_ui_has_no_quota(tmp_path, monkeypatch):
+    monkeypatch.setattr(scraper, "STATE_DIR", tmp_path)
+    monkeypatch.setenv("QUOTA_OVERRIDE", "15,000")
+    pw, _browser, _page = _make_browser_mock(elements=[_MockElement("951 AI credits used")])
+
+    with patch("scraper.sync_playwright") as mock_ctx:
+        mock_ctx.return_value.__enter__.return_value = pw
+        mock_ctx.return_value.__exit__.return_value = False
+        metrics = scraper.scrape()
+
+    assert metrics[0]["used"] == 951
+    assert metrics[0]["quota"] == 15000
+
+
+def test_scrape_quota_override_replaces_ui_quota(tmp_path, monkeypatch):
+    monkeypatch.setattr(scraper, "STATE_DIR", tmp_path)
+    monkeypatch.setenv("QUOTA_OVERRIDE", "20000")
+    pw, _browser, _page = _make_browser_mock()
+
+    with patch("scraper.sync_playwright") as mock_ctx:
+        mock_ctx.return_value.__enter__.return_value = pw
+        mock_ctx.return_value.__exit__.return_value = False
+        metrics = scraper.scrape()
+
+    assert metrics[0]["quota"] == 20000
+
+
+def test_invalid_quota_override_raises(monkeypatch):
+    monkeypatch.setenv("QUOTA_OVERRIDE", "not-a-number")
+
+    with pytest.raises(ValueError, match="positive integer"):
+        scraper._apply_quota_override([{"quota": None}])
+
+
 def test_scrape_unauthenticated_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(scraper, "STATE_DIR", tmp_path)
-    pw, browser, page = _make_browser_mock(url="https://github.com/login")
+    pw, browser, _page = _make_browser_mock(url="https://github.com/login")
 
     with patch("scraper.sync_playwright") as mock_ctx:
         mock_ctx.return_value.__enter__.return_value = pw
@@ -250,7 +285,7 @@ def test_get_auth_status_authenticated(tmp_path, monkeypatch):
         scraper._AUTH_CACHE["payload"] = None
 
     future_ts = datetime.now(tz=timezone.utc).timestamp() + 86400
-    pw, browser, page = _make_browser_mock()
+    pw, browser, _page = _make_browser_mock()
     browser.cookies.return_value = [{"name": "user_session", "expires": future_ts}]
 
     with patch("scraper.sync_playwright") as mock_ctx:
@@ -270,7 +305,7 @@ def test_get_auth_status_uses_cache(tmp_path, monkeypatch):
         scraper._AUTH_CACHE["checked_at_epoch"] = None
         scraper._AUTH_CACHE["payload"] = None
 
-    pw, browser, page = _make_browser_mock()
+    pw, browser, _page = _make_browser_mock()
     browser.cookies.return_value = []
 
     with patch("scraper.sync_playwright") as mock_ctx:
