@@ -52,6 +52,8 @@ def get_conn(db_path: Path = DB_PATH):
 
 
 def init_db(db_path: Path = DB_PATH) -> None:
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     with get_conn(db_path) as conn:
         conn.executescript(SCHEMA)
 

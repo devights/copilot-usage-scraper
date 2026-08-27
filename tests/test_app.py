@@ -95,6 +95,24 @@ def test_api_daily_limits_to_last_30_weekdays(monkeypatch):
 
 # ── Deduplication ──────────────────────────────────────────────────────────────
 
+def test_init_db_creates_parent_directory_and_schema(tmp_path):
+    import db
+
+    test_db = tmp_path / "data" / "usage.db"
+
+    db.init_db(test_db)
+
+    assert test_db.is_file()
+    with db.get_conn(test_db) as conn:
+        tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert {"usage_snapshots", "scrape_errors", "metadata"} <= tables
+
+
 def test_save_snapshot_deduplication(tmp_path):
     """Second save with identical used/quota must not insert a new row."""
     import db
