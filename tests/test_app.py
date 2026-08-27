@@ -56,8 +56,18 @@ def test_api_daily_skips_weekends_and_reset_days(monkeypatch):
 
     assert resp.status_code == 200
     assert resp.get_json() == [
-        {"date": "2026-07-24", "credits": 10},
-        {"date": "2026-07-28", "credits": 20},
+        {
+            "date": "2026-07-24",
+            "credits": 10,
+            "active_hours": 0.0,
+            "credits_per_hour": None,
+        },
+        {
+            "date": "2026-07-28",
+            "credits": 20,
+            "active_hours": 0.0,
+            "credits_per_hour": None,
+        },
     ]
 
 
